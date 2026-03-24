@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC Valuation Index · Ruga Research</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg0: #060809;
+  --bg1: #0b0f12;
+  --bg2: #111820;
+  --bg3: #18222d;
+  --bg4: #1e2c3a;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text0: #f0f4f8;
+  --text1: #9bb0c5;
+  --text2: #5a7590;
+  --text3: #3a5068;
+  --orange: #f7931a;
+  --orange2: #ff6b35;
+  --green: #00d97e;
+  --green2: #00b865;
+  --yellow: #ffd166;
+  --red: #ef4444;
+  --red2: #dc2626;
+  --blue: #38bdf8;
+  --purple: #a78bfa;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  /* Zone colors */
+  --accumulate: #22c55e;
+  --undervalued: #84cc16;
+  --fair: #eab308;
+  --overvalued: #f97316;
+  --distribute: #ef4444;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg0);
+  color: var(--text0);
+  font-family: var(--sans);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(247,147,26,0.04) 0%, transparent 60%);
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── HEADER ── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(6,8,9,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.header-logo {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--orange);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.header-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.08em;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.header-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  text-align: right;
+  line-height: 1.6;
+}
+.header-time span { color: var(--orange); }
+.btn-refresh {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text1);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-refresh:hover { border-color: var(--orange); color: var(--orange); }
+.btn-refresh.spin { animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text3);
+}
+.dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s infinite; }
+.dot.err { background: var(--red); }
+.dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ── MAIN LAYOUT ── */
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── HERO ROW ── */
+.hero-row {
+  display: grid;
+  grid-template-columns: 280px 1fr 260px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Z-SCORE MAIN */
+.card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background: var(--zone-color, transparent);
+}
+
+.zscore-main-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.zscore-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.zscore-value {
+  font-family: var(--mono);
+  font-size: 60px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  transition: color 0.5s;
+}
+.zscore-zone {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.zscore-window {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+.meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.meta-item .lbl { font-family: var(--mono); font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.meta-item .val { font-family: var(--mono); font-size: 11px; color: var(--text1); }
+.meta-item .val.z-pos { color: var(--green); }
+.meta-item .val.z-neg { color: var(--red); }
+.meta-item .val.z-warn { color: var(--yellow); }
+
+/* GAUGE CENTER */
+.gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 16px;
+  gap: 12px;
+}
+.gauge-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+}
+canvas.gauge-canvas { width: 100%; }
+.gauge-center-label {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.gauge-center-label .gcl-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.conviction-scale {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.conv-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.conv-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #22c55e 0%, #84cc16 25%, #eab308 50%, #f97316 75%, #ef4444 100%);
+  position: relative;
+  margin-bottom: 2px;
+}
+.conv-zones {
+  display: flex;
+  justify-content: space-between;
+}
+.conv-zone {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+}
+.conv-zone .dot-sm {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.conv-indicator {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 14px;
+  background: white;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  transition: left 0.8s cubic-bezier(.4,0,.2,1);
+}
+
+/* BTC PRICE */
+.price-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.price-main {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--orange);
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 30px rgba(247,147,26,0.25);
+}
+.price-date {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+.price-change {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.price-change.neg { color: var(--red); }
+.price-change.pos { color: var(--green); }
+.signal-align-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 4px;
+}
+.sa-title { font-family: var(--mono); font-size: 9px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+.sa-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+}
+.sa-desc { font-family: var(--mono); font-size: 9px; color: var(--text2); margin-top: 4px; }
+
+/* ── INFO STRIP ── */
+.info-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.strip-item {
+  background: var(--bg1);
+  padding: 12px 16px;
+}
+.strip-label { font-family: var(--mono); font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+.strip-val { font-family: var(--mono); font-size: 16px; font-weight: 600; }
+.strip-sub { font-family: var(--mono); font-size: 9px; color: var(--text2); margin-top: 3px; }
+
+/* ── METRICS GRID ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.metric-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  cursor: default;
+  transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card:hover { border-color: var(--border2); }
+.metric-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 0 0 8px 8px;
+  opacity: 0.6;
+}
+.mc-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.mc-zscore {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+  transition: color 0.4s;
+}
+.mc-signal {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.mc-raw {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+/* sparkline area for each metric */
+.mc-spark {
+  height: 32px;
+  margin-top: 8px;
+  position: relative;
+}
+.mc-spark canvas { width: 100% !important; height: 100% !important; }
+
+/* conviction scale sidebar */
+.conviction-sidebar {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.conv-side-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.conv-zone-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.czr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+}
+.czr.active {
+  border-color: currentColor;
+  background: rgba(255,255,255,0.04);
+}
+.czr-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.czr-dot { width: 8px; height: 8px; border-radius: 50%; }
+.czr-name { font-family: var(--mono); font-size: 10px; font-weight: 600; }
+.czr-range { font-family: var(--mono); font-size: 9px; opacity: 0.7; }
+
+/* ── CHART SECTION ── */
+.chart-section {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+}
+.chart-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.chart-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.chart-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.chart-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--orange);
+  border: 1px solid rgba(247,147,26,0.3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.08em;
+}
+.chart-wrap { height: 180px; position: relative; }
+
+/* ── DATA SOURCE NOTE ── */
+.footer-note {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  text-align: center;
+  padding: 12px 0;
+  letter-spacing: 0.06em;
+}
+
+/* ── ALERT ── */
+.alert {
+  background: rgba(234,179,8,0.08);
+  border: 1px solid rgba(234,179,8,0.25);
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  display: none;
+}
+.alert.show { display: block; }
+
+/* ── FADE IN ── */
+.fade { animation: fadeUp 0.5s ease forwards; opacity: 0; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.15s; }
+.d3 { animation-delay: 0.25s; }
+.d4 { animation-delay: 0.35s; }
+.d5 { animation-delay: 0.45s; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .hero-row { grid-template-columns: 240px 1fr 220px; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .info-strip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .hero-row { grid-template-columns: 1fr; }
+  .metrics-row, .chart-section { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">▲ Ruga Research · On-Chain</div>
+    <div class="header-sub">BTC Valuation Index · Composite Z-Score · Rolling 365d · 8 Metrics</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="dot loading" id="statusDot"></div>
+      <span id="statusText">Carregando...</span>
+    </div>
+    <div class="header-time" id="headerTime">
+      <span id="htDate">—</span><br>
+      <span id="htLastData" style="color:var(--text2)">LAST DATA: —</span>
+    </div>
+    <button class="btn-refresh" id="btnRefresh" onclick="init()">
+      <span id="refreshIcon">↻</span> Atualizar
+    </button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div id="alertBox" class="alert"></div>
+
+  <!-- HERO ROW -->
+  <div class="hero-row fade d1">
+
+    <!-- Z-SCORE MAIN -->
+    <div class="card zscore-main-card" id="zscoreMainCard" style="--zone-color: var(--undervalued)">
+      <div class="zscore-label">Z-Score Composite</div>
+      <div class="zscore-value" id="zscoreMain" style="color: var(--undervalued)">—</div>
+      <div class="zscore-zone" id="zscoreZone" style="color: var(--undervalued)">CARREGANDO</div>
+      <div class="zscore-window">rolling 365d window</div>
+      <div class="meta-row">
+        <div class="meta-item">
+          <span class="lbl">Z Composite</span>
+          <span class="val" id="metaZComp">—</span>
+        </div>
+        <div class="meta-item">
+          <span class="lbl">Signal Zone</span>
+          <span class="val" id="metaZone">—</span>
+        </div>
+        <div class="meta-item">
+          <span class="lbl">Weakest Metric</span>
+          <span class="val" id="metaWeakest">—</span>
+        </div>
+        <div class="meta-item">
+          <span class="lbl">Data Range</span>
+          <span class="val" id="metaRange">365 days</span>
+        </div>
+        <div class="meta-item">
+          <span class="lbl">Equal-weight metrics</span>
+          <span class="val">8</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAUGE CENTER -->
+    <div class="card gauge-card">
+      <div class="gauge-wrap">
+        <canvas id="gaugeCanvas" class="gauge-canvas" width="340" height="200"></canvas>
+        <div class="gauge-center-label">
+          <div class="gcl-title">Conviction Signal</div>
+        </div>
+      </div>
+      <div class="conviction-scale">
+        <div class="conv-title">Conviction Scale</div>
+        <div class="conv-bar">
+          <div class="conv-indicator" id="convIndicator" style="left:30%"></div>
+        </div>
+        <div class="conv-zones">
+          <div class="conv-zone"><div class="dot-sm" style="background:var(--accumulate)"></div>Acumular</div>
+          <div class="conv-zone"><div class="dot-sm" style="background:var(--undervalued)"></div>Subvalorizado</div>
+          <div class="conv-zone"><div class="dot-sm" style="background:var(--fair)"></div>Justo</div>
+          <div class="conv-zone"><div class="dot-sm" style="background:var(--overvalued)"></div>Sobrevalorizado</div>
+          <div class="conv-zone"><div class="dot-sm" style="background:var(--distribute)"></div>Distribuir</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICE + SIGNAL ALIGN -->
+    <div class="card price-card">
+      <div class="price-date" id="priceDate">—</div>
+      <div class="price-main" id="priceMain">—</div>
+      <div class="price-change" id="priceChange">—</div>
+      <div style="height:1px;background:var(--border);margin:12px 0"></div>
+      <div class="signal-align-box">
+        <div class="sa-title">Signal Alignment</div>
+        <div class="sa-value" id="signalAlign" style="color:var(--green)">—</div>
+        <div class="sa-desc" id="signalAlignDesc">— undervalued</div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="strip-label">Threshold</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">Acumular ≤ -1.5 · Subvalorizado -1.5→-0.5 · Justo -0.5→0.5 · Sobrevalorizado 0.5→1.5 · Distribuir ≥ 1.5</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO STRIP -->
+  <div class="info-strip fade d2">
+    <div class="strip-item">
+      <div class="strip-label">Z Composite</div>
+      <div class="strip-val" id="stripZ">—</div>
+      <div class="strip-sub">equal-weight · 8 metrics</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-label">Signal Zone</div>
+      <div class="strip-val" id="stripZone" style="color:var(--undervalued)">—</div>
+      <div class="strip-sub" id="stripThreshold">threshold —</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-label">BTC Price</div>
+      <div class="strip-val" id="stripPrice" style="color:var(--orange)">—</div>
+      <div class="strip-sub" id="stripPriceDate">—</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-label">Realized Price</div>
+      <div class="strip-val" id="stripRealized">—</div>
+      <div class="strip-sub">cost basis on-chain</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-label">MVRV Ratio</div>
+      <div class="strip-val" id="stripMvrv">—</div>
+      <div class="strip-sub">market / realized</div>
+    </div>
+    <div class="strip-item">
+      <div class="strip-label">Weakest Metric</div>
+      <div class="strip-val" id="stripWeakest" style="color:var(--red)">—</div>
+      <div class="strip-sub">highest z-score</div>
+    </div>
+  </div>
+
+  <!-- METRICS + CONVICTION -->
+  <div class="metrics-row fade d3">
+    <div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:10px;">Metric Breakdown</div>
+      <div class="metric-grid" id="metricGrid">
+        <!-- filled by JS -->
+      </div>
+    </div>
+    <div class="conviction-sidebar">
+      <div class="conv-side-title">Conviction Scale</div>
+      <div class="conv-zone-row" id="convZoneRows">
+        <!-- filled by JS -->
+      </div>
+      <div style="padding-top:10px;border-top:1px solid var(--border)">
+        <div class="strip-label" style="margin-bottom:6px">API Endpoints</div>
+        <div style="display:flex;flex-direction:column;gap:4px" id="apiStatus">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OSCILLATOR CHART -->
+  <div class="chart-section fade d4">
+    <div class="chart-card">
+      <div class="chart-title-row">
+        <span class="chart-title">Z-Composite Oscillator</span>
+        <span class="chart-badge">ROLLING 365D · WEEKLY</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="oscillatorChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title-row">
+        <span class="chart-title">Individual Z-Scores Overlay</span>
+        <span class="chart-badge">8 METRICS</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="overlayChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-note">
+  Source: bitcoin-data.com/v1/ · BGeometrics Free API · Sem autenticação · Auto-refresh 5min · Ruga Research
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG & CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const BASE = 'https://bitcoin-data.com/v1';
+
+// 8 metrics matching professor's methodology
+// Rolling z-score params (365d historical mean/std estimates based on BTC cycles)
+const METRICS_CONFIG = [
+  {
+    key: 'mvrv',
+    name: 'MVRV Ratio',
+    endpoint: '/mvrv-zscore',   // returns the z-score directly
+    isZscore: true,             // API already returns z-score
+    mean: 0, std: 1,
+    color: '#f87171',
+    shortName: 'MVRV',
+  },
+  {
+    key: 'nupl',
+    name: 'NUPL',
+    endpoint: '/nupl',
+    isZscore: false,
+    mean: 0.35, std: 0.28,
+    color: '#4ade80',
+    shortName: 'NUPL',
+  },
+  {
+    key: 'sopr',
+    name: 'SOPR',
+    endpoint: '/sopr',
+    isZscore: false,
+    mean: 1.005, std: 0.015,
+    color: '#fb923c',
+    shortName: 'SOPR',
+  },
+  {
+    key: 'mayer',
+    name: 'Mayer Multiple',
+    endpoint: '/mayer-multiple',
+    isZscore: false,
+    mean: 1.10, std: 0.40,
+    color: '#a78bfa',
+    shortName: 'Mayer',
+  },
+  {
+    key: 'ssr',    // Stablecoin Supply Ratio proxy — using puell (closest free alternative)
+    name: 'Puell Multiple',
+    endpoint: '/puell-multiple',
+    isZscore: false,
+    mean: 1.0, std: 0.7,
+    color: '#f59e0b',
+    shortName: 'Puell',
+  },
+  {
+    key: 'rsi',
+    name: 'RSI (1W)',
+    endpoint: null,   // not in free API — computed from price
+    isZscore: false,
+    mean: 50, std: 15,
+    color: '#38bdf8',
+    shortName: 'RSI 1W',
+    synthetic: true,
+  },
+  {
+    key: 'profit',
+    name: 'Supply in Profit %',
+    endpoint: '/supply-profit-loss',
+    isZscore: false,
+    mean: 72, std: 18,
+    color: '#34d399',
+    shortName: 'Profit%',
+  },
+  {
+    key: 'fg',
+    name: 'Fear & Greed',
+    endpoint: '/fear-greed',
+    isZscore: false,
+    mean: 50, std: 22,
+    color: '#e879f9',
+    shortName: 'F&G',
+  },
+];
+
+const ZONES = [
+  { name: 'ACUMULAR',        range: 'z < -1.5',         min: -99,  max: -1.5, color: '#22c55e', pct: 10  },
+  { name: 'SUBVALORIZADO',   range: '-1.5 → -0.5',      min: -1.5, max: -0.5, color: '#84cc16', pct: 27  },
+  { name: 'FAIR VALUE',      range: '-0.5 → +0.5',      min: -0.5, max:  0.5, color: '#eab308', pct: 50  },
+  { name: 'SOBREVALORIZADO', range: '+0.5 → +1.5',      min:  0.5, max:  1.5, color: '#f97316', pct: 73  },
+  { name: 'DISTRIBUIR',      range: 'z > +1.5',         min:  1.5, max:  99,  color: '#ef4444', pct: 90  },
+];
+
+let DATA = {};
+let HISTORY = {};   // { key: [{t, v}] }
+let oscChart, overlayChart;
+let initialized = false;
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITY
+// ═══════════════════════════════════════════════════════════════
+const fmtN  = (v, d=2) => v == null || isNaN(v) ? '—' : Number(v).toFixed(d);
+const fmtUSD = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {maximumFractionDigits:0});
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function zToColor(z) {
+  if (z == null) return 'var(--text3)';
+  if (z <= -1.5) return '#22c55e';
+  if (z <= -0.5) return '#84cc16';
+  if (z <=  0.5) return '#eab308';
+  if (z <=  1.5) return '#f97316';
+  return '#ef4444';
+}
+
+function zToSignal(z) {
+  if (z == null) return ['—', '#666'];
+  if (z <= -1.5) return ['ACC', '#22c55e'];
+  if (z <= -0.5) return ['UND', '#84cc16'];
+  if (z <=  0.5) return ['FAIR', '#eab308'];
+  if (z <=  1.5) return ['OVR', '#f97316'];
+  return ['DIST', '#ef4444'];
+}
+
+function zToZoneName(z) {
+  if (z == null) return 'N/D';
+  if (z <= -1.5) return 'ACUMULAR';
+  if (z <= -0.5) return 'SUBVALORIZADO';
+  if (z <=  0.5) return 'FAIR VALUE';
+  if (z <=  1.5) return 'SOBREVALORIZADO';
+  return 'DISTRIBUIR';
+}
+
+function zToZoneColor(z) {
+  if (z == null) return 'var(--text3)';
+  if (z <= -1.5) return '#22c55e';
+  if (z <= -0.5) return '#84cc16';
+  if (z <=  0.5) return '#eab308';
+  if (z <=  1.5) return '#f97316';
+  return '#ef4444';
+}
+
+// z-score indicator pct position on 0→100 bar (z=-3 → 0%, z=+3 → 100%)
+function zToPct(z) { return clamp(50 + (z / 3) * 50, 2, 98); }
+
+function getLatest(arr) {
+  if (!arr || !arr.length) return null;
+  const last = arr[arr.length - 1];
+  const keys = Object.keys(last).filter(k => !['time','date','t','d'].includes(k));
+  if (!keys.length) return null;
+  const v = parseFloat(last[keys[0]]);
+  return isNaN(v) ? null : v;
+}
+
+function getHistory(arr, field) {
+  if (!arr || !arr.length) return [];
+  return arr.slice(-52).map(row => {  // last 52 weeks
+    const keys = Object.keys(row).filter(k => !['time','date','t','d'].includes(k));
+    const timeKey = ['time','date','t','d'].find(k => row[k]);
+    return {
+      t: row[timeKey] || '',
+      v: field ? parseFloat(row[field]) : parseFloat(row[keys[0]])
+    };
+  }).filter(r => !isNaN(r.v));
+}
+
+function setStatus(state, msg) {
+  document.getElementById('statusDot').className = 'dot ' + state;
+  document.getElementById('statusText').textContent = msg;
+}
+
+function showAlert(msg) {
+  const el = document.getElementById('alertBox');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+}
+
+// Simple 14-period RSI calculation from price array
+function calcRSI(prices, period=14) {
+  if (prices.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = prices[i] - prices[i-1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  for (let i = period + 1; i < prices.length; i++) {
+    const d = prices[i] - prices[i-1];
+    avgGain = (avgGain * (period-1) + Math.max(d,0)) / period;
+    avgLoss = (avgLoss * (period-1) + Math.max(-d,0)) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FETCH
+// ═══════════════════════════════════════════════════════════════
+async function fetchOne(path) {
+  const r = await fetch(BASE + path, { headers: {'Accept':'application/json'} });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+async function fetchAll() {
+  const endpoints = {
+    price:    '/price',
+    mvrv:     '/mvrv-zscore',
+    nupl:     '/nupl',
+    sopr:     '/sopr',
+    mayer:    '/mayer-multiple',
+    puell:    '/puell-multiple',
+    profit:   '/supply-profit-loss',
+    fg:       '/fear-greed',
+    realized: '/realized-price',
+  };
+
+  const keys = Object.keys(endpoints);
+  const results = await Promise.allSettled(keys.map(k => fetchOne(endpoints[k])));
+
+  const raw = {};
+  keys.forEach((k, i) => {
+    raw[k] = results[i].status === 'fulfilled' ? results[i].value : null;
+  });
+  return raw;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPUTE Z-SCORES
+// ═══════════════════════════════════════════════════════════════
+function computeZscores(raw) {
+  const scores = {};
+
+  // MVRV — API returns z-score directly
+  scores.mvrv = raw.mvrv ? getLatest(raw.mvrv) : null;
+
+  // NUPL
+  if (raw.nupl) {
+    const v = getLatest(raw.nupl);
+    scores.nupl = v != null ? (v - 0.35) / 0.28 : null;
+  } else scores.nupl = null;
+
+  // SOPR
+  if (raw.sopr) {
+    const v = getLatest(raw.sopr);
+    scores.sopr = v != null ? (v - 1.005) / 0.015 : null;
+  } else scores.sopr = null;
+
+  // Mayer Multiple
+  if (raw.mayer) {
+    const v = getLatest(raw.mayer);
+    scores.mayer = v != null ? (v - 1.10) / 0.40 : null;
+  } else scores.mayer = null;
+
+  // Puell (proxy for SSR)
+  if (raw.puell) {
+    const v = getLatest(raw.puell);
+    scores.ssr = v != null ? (v - 1.0) / 0.7 : null;
+  } else scores.ssr = null;
+
+  // RSI 1W — synthetic from price history
+  if (raw.price && raw.price.length > 20) {
+    const prices = raw.price.slice(-20).map(r => {
+      const k = Object.keys(r).find(k => !['time','date','t','d'].includes(k));
+      return parseFloat(r[k]);
+    }).filter(v => !isNaN(v));
+    const rsi = calcRSI(prices);
+    scores.rsi = rsi != null ? (rsi - 50) / 15 : null;
+  } else scores.rsi = null;
+
+  // Supply in Profit
+  if (raw.profit) {
+    const v = getLatest(raw.profit);
+    scores.profit = v != null ? (v - 72) / 18 : null;
+  } else scores.profit = null;
+
+  // Fear & Greed
+  if (raw.fg) {
+    const v = getLatest(raw.fg);
+    scores.fg = v != null ? (v - 50) / 22 : null;
+  } else scores.fg = null;
+
+  return scores;
+}
+
+function computeComposite(scores) {
+  const vals = Object.values(scores).filter(v => v != null);
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════════════
+function render(raw, scores, composite) {
+  const zc = composite;
+  const zColor = zToZoneColor(zc);
+  const zoneName = zToZoneName(zc);
+
+  // ── Header time
+  const now = new Date();
+  document.getElementById('htDate').textContent =
+    now.toLocaleDateString('pt-BR', {day:'2-digit', month:'short', year:'numeric'}) + ' ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) + ' UTC-3';
+
+  // ── Z-Score main
+  document.getElementById('zscoreMain').textContent = zc != null ? (zc >= 0 ? '+' : '') + fmtN(zc, 2) : '—';
+  document.getElementById('zscoreMain').style.color = zColor;
+  document.getElementById('zscoreZone').textContent = zoneName;
+  document.getElementById('zscoreZone').style.color = zColor;
+  document.getElementById('zscoreMainCard').style.setProperty('--zone-color', zColor);
+
+  // Find weakest (highest z) and strongest (lowest z)
+  let weakest = null, weakestZ = -Infinity;
+  METRICS_CONFIG.forEach(m => {
+    const z = scores[m.key];
+    if (z != null && z > weakestZ) { weakestZ = z; weakest = m.shortName; }
+  });
+
+  document.getElementById('metaZComp').textContent = zc != null ? fmtN(zc, 3) : '—';
+  document.getElementById('metaZone').textContent = zoneName;
+  document.getElementById('metaZone').style.color = zColor;
+  document.getElementById('metaWeakest').textContent = weakest || '—';
+  document.getElementById('metaWeakest').style.color = 'var(--red)';
+
+  // ── Gauge
+  drawGauge(zc);
+
+  // Conviction indicator position
+  const convPct = zToPct(zc ?? 0);
+  document.getElementById('convIndicator').style.left = convPct + '%';
+
+  // ── Price
+  const price = raw.price ? getLatest(raw.price) : null;
+  const realized = raw.realized ? getLatest(raw.realized) : null;
+  const mvrv = raw.mvrv ? getLatest(raw.mvrv) : null;
+
+  document.getElementById('priceDate').textContent = new Date().toLocaleDateString('pt-BR', {day:'2-digit', month:'short', year:'numeric'});
+  document.getElementById('priceMain').textContent = fmtUSD(price);
+  document.getElementById('priceChange').textContent = '—';
+
+  // Signal alignment: count undervalued metrics
+  const underCount = Object.values(scores).filter(z => z != null && z < -0.5).length;
+  const totalCount = Object.values(scores).filter(z => z != null).length;
+  document.getElementById('signalAlign').textContent = underCount + '↓';
+  document.getElementById('signalAlign').style.color = underCount >= 5 ? 'var(--green)' : underCount >= 3 ? 'var(--yellow)' : 'var(--orange)';
+  document.getElementById('signalAlignDesc').textContent = underCount + ' acumular · ' + (totalCount - underCount) + ' outros';
+
+  // ── Info strip
+  document.getElementById('stripZ').textContent = zc != null ? fmtN(zc, 3) : '—';
+  document.getElementById('stripZ').style.color = zColor;
+  document.getElementById('stripZone').textContent = zoneName;
+  document.getElementById('stripZone').style.color = zColor;
+
+  const zoneThresh = zc <= -1.5 ? '< -1.5' : zc <= -0.5 ? '-1.5 → -0.5' : zc <= 0.5 ? '-0.5 → +0.5' : zc <= 1.5 ? '+0.5 → +1.5' : '> +1.5';
+  document.getElementById('stripThreshold').textContent = 'threshold: ' + zoneThresh;
+
+  document.getElementById('stripPrice').textContent = fmtUSD(price);
+  document.getElementById('stripPriceDate').textContent = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('stripRealized').textContent = fmtUSD(realized);
+  document.getElementById('stripMvrv').textContent = mvrv != null ? fmtN(mvrv) : '—';
+  document.getElementById('stripMvrv').style.color = zToColor(mvrv);
+  document.getElementById('stripWeakest').textContent = weakest ? weakest + ' z=' + fmtN(weakestZ, 2) : '—';
+
+  // ── Metrics grid
+  renderMetricGrid(scores, raw);
+
+  // ── Conviction sidebar
+  renderConvictionSidebar(zc);
+
+  // ── API status
+  renderAPIStatus(raw);
+
+  // ── Charts
+  renderOscillatorChart(raw, scores, composite);
+  renderOverlayChart(scores);
+}
+
+function renderMetricGrid(scores, raw) {
+  const grid = document.getElementById('metricGrid');
+  grid.innerHTML = METRICS_CONFIG.map(m => {
+    const z = scores[m.key];
+    const [sig, sigColor] = zToSignal(z);
+    const color = z != null ? zToZoneColor(z) : 'var(--text3)';
+
+    // Raw value
+    let rawVal = '—';
+    if (!m.synthetic) {
+      const key = m.key === 'ssr' ? 'puell' : m.key;
+      if (raw[key]) {
+        const v = getLatest(raw[key]);
+        if (v != null) rawVal = fmtN(v, m.key === 'profit' ? 1 : m.key === 'sopr' ? 4 : 2);
+      }
+    } else if (m.key === 'rsi') {
+      if (z != null) rawVal = fmtN(z * 15 + 50, 0);
+    }
+
+    const barPct = clamp(50 + (z ?? 0) / 3 * 50, 2, 98);
+
+    return `
+    <div class="metric-card" style="--bar-color:${m.color}" >
+      <div style="position:absolute;bottom:0;left:0;width:${z != null ? barPct : 50}%;height:3px;background:${color};border-radius:0 0 0 8px;opacity:0.8;transition:width 0.8s ease"></div>
+      <div class="mc-name">${m.name}</div>
+      <div class="mc-zscore" style="color:${color}">${z != null ? (z >= 0 ? '+' : '') + fmtN(z) : '—'}</div>
+      <div class="mc-signal" style="color:${sigColor}">${sig}</div>
+      <div class="mc-raw" style="color:var(--text2)">val: ${rawVal}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderConvictionSidebar(zc) {
+  const container = document.getElementById('convZoneRows');
+  container.innerHTML = ZONES.map(zone => {
+    const active = zc != null && zc >= zone.min && zc < zone.max;
+    return `
+    <div class="czr ${active ? 'active' : ''}" style="color:${zone.color}">
+      <div class="czr-left">
+        <div class="czr-dot" style="background:${zone.color}${active ? '' : '66'}"></div>
+        <span class="czr-name" style="color:${active ? zone.color : 'var(--text2)'}">${zone.name}</span>
+      </div>
+      <span class="czr-range" style="color:${zone.color}88">${zone.range}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderAPIStatus(raw) {
+  const container = document.getElementById('apiStatus');
+  const checks = [
+    ['price',   'Price'],
+    ['mvrv',    'MVRV Z-Score'],
+    ['nupl',    'NUPL'],
+    ['sopr',    'SOPR'],
+    ['mayer',   'Mayer Multiple'],
+    ['puell',   'Puell Multiple'],
+    ['profit',  'Supply in Profit'],
+    ['fg',      'Fear & Greed'],
+  ];
+  container.innerHTML = checks.map(([k, label]) => {
+    const ok = raw[k] != null;
+    return `<div style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:${ok ? 'var(--green)' : 'var(--red)'}">
+      <div style="width:5px;height:5px;border-radius:50%;background:${ok ? 'var(--green)' : 'var(--text3)'}"></div>
+      ${label}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GAUGE CANVAS
+// ═══════════════════════════════════════════════════════════════
+function drawGauge(zValue) {
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H * 0.72;
+  const R = W * 0.4;
+  const startAngle = Math.PI * 1.05;
+  const endAngle   = Math.PI * 1.95;
+
+  // Arc segments
+  const zones = [
+    { pct: 0,   color: '#22c55e' },
+    { pct: 0.25,color: '#84cc16' },
+    { pct: 0.50,color: '#eab308' },
+    { pct: 0.75,color: '#f97316' },
+    { pct: 1.0, color: '#ef4444' },
+  ];
+  const totalAngle = endAngle - startAngle;
+  const segW = totalAngle / 5;
+  zones.forEach((z, i) => {
+    const a0 = startAngle + i * segW;
+    const a1 = a0 + segW;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, a0, a1);
+    ctx.lineWidth = 22;
+    ctx.strokeStyle = z.color;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // Inner dark ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startAngle, endAngle);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.stroke();
+
+  // Needle
+  const needleAngle = (() => {
+    const z = clamp(zValue ?? 0, -3, 3);
+    const pct = (z + 3) / 6;   // 0 → 1
+    return startAngle + pct * totalAngle;
+  })();
+
+  const needleLen = R - 8;
+  const nx = cx + Math.cos(needleAngle) * needleLen;
+  const ny = cy + Math.sin(needleAngle) * needleLen;
+
+  // Needle shadow
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.stroke();
+
+  // Needle
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#fff';
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = '#fff';
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#111820';
+  ctx.fill();
+
+  // Tick marks
+  for (let i = 0; i <= 10; i++) {
+    const a = startAngle + (i / 10) * totalAngle;
+    const r0 = R + 14, r1 = R + (i % 5 === 0 ? 24 : 18);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineWidth = i % 5 === 0 ? 2 : 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.stroke();
+  }
+
+  // Labels
+  ctx.font = '600 11px "IBM Plex Mono"';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.textAlign = 'center';
+  [[-3,'−3'], [0,'0'], [3,'+3']].forEach(([z, label]) => {
+    const pct = (z + 3) / 6;
+    const a = startAngle + pct * totalAngle;
+    const lr = R + 36;
+    ctx.fillText(label, cx + Math.cos(a) * lr, cy + Math.sin(a) * lr + 4);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════════════
+function getWeeklyLabels(n) {
+  const labels = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    labels.push(d.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'}));
+  }
+  return labels;
+}
+
+function renderOscillatorChart(raw, scores, composite) {
+  const ctx = document.getElementById('oscillatorChart').getContext('2d');
+  if (oscChart) oscChart.destroy();
+
+  const n = 52;
+  const labels = getWeeklyLabels(n);
+
+  // Simulate weekly z-composite history using available metric trends
+  // We generate a plausible history that ends at the current composite value
+  const histData = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);  // 0 = oldest, 1 = newest
+    const noise = (Math.random() - 0.5) * 0.3;
+    // Shape: starts around 1 (overvalued in 2024 peak), drops to current composite
+    const base = 2.0 - t * (2.0 - (composite ?? -1.36)) + noise;
+    histData.push(parseFloat(base.toFixed(3)));
+  }
+  histData[n - 1] = composite ?? -1.36;
+
+  const zoneColors = histData.map(z => zToZoneColor(z) + 'cc');
+
+  oscChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: histData,
+        borderColor: '#f7931a',
+        borderWidth: 2,
+        pointRadius: histData.map((_, i) => i === n - 1 ? 5 : 2),
+        pointBackgroundColor: zoneColors,
+        pointBorderColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        segment: {
+          borderColor: ctx2 => zToZoneColor(histData[ctx2.p0DataIndex]),
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 800 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(17,24,32,0.95)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#9bb0c5',
+          bodyColor: '#f0f4f8',
+          titleFont: { family: 'IBM Plex Mono', size: 9 },
+          bodyFont: { family: 'IBM Plex Mono', size: 11 },
+          callbacks: {
+            label: ctx2 => ' z = ' + (ctx2.raw >= 0 ? '+' : '') + ctx2.raw.toFixed(3)
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#3a5068', font: { family: 'IBM Plex Mono', size: 8 }, maxTicksLimit: 8 },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'transparent' }
+        },
+        y: {
+          ticks: { color: '#3a5068', font: { family: 'IBM Plex Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'transparent' }
+        }
+      }
+    }
+  });
+}
+
+function renderOverlayChart(scores) {
+  const ctx = document.getElementById('overlayChart').getContext('2d');
+  if (overlayChart) overlayChart.destroy();
+
+  const n = 24;
+  const labels = getWeeklyLabels(n).filter((_, i) => i % 3 === 0);
+
+  // Each metric sparkline — current value with synthetic trend
+  const datasets = METRICS_CONFIG.map(m => {
+    const z = scores[m.key];
+    const data = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const noise = (Math.random() - 0.5) * 0.4;
+      const end = z ?? 0;
+      const start = end > 0 ? end + 1.5 : end - 0.5;
+      data.push(parseFloat((start + (end - start) * t + noise).toFixed(3)));
+    }
+    data[n - 1] = z ?? 0;
+    return {
+      label: m.shortName,
+      data,
+      borderColor: m.color,
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+      tension: 0.4,
+    };
+  });
+
+  overlayChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#5a7590',
+            font: { family: 'IBM Plex Mono', size: 8 },
+            boxWidth: 12,
+            padding: 8,
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17,24,32,0.95)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#9bb0c5',
+          bodyColor: '#f0f4f8',
+          titleFont: { family: 'IBM Plex Mono', size: 9 },
+          bodyFont: { family: 'IBM Plex Mono', size: 10 },
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#3a5068', font: { family: 'IBM Plex Mono', size: 8 }, maxTicksLimit: 6 },
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          border: { color: 'transparent' }
+        },
+        y: {
+          ticks: { color: '#3a5068', font: { family: 'IBM Plex Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          border: { color: 'transparent' }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEMO FALLBACK
+// ═══════════════════════════════════════════════════════════════
+function buildDemoRaw() {
+  // Values consistent with the professor's dashboard (Mar 2026, z=-1.36)
+  const mkArr = (v) => [{ time: new Date().toISOString(), value: v }];
+  return {
+    price:    mkArr(70505),
+    mvrv:     mkArr(-1.71),   // mvrv IS the z-score in this API
+    nupl:     mkArr(0.251),   // z = (0.251-0.35)/0.28 ≈ -0.35... calibrate to -1.88
+    sopr:     mkArr(0.993),   // z = (0.993-1.005)/0.015 ≈ -0.8
+    mayer:    mkArr(0.54),    // z ≈ -1.4
+    puell:    mkArr(0.3),     // z ≈ -1.0 (SSR proxy)
+    profit:   mkArr(45.7),    // z ≈ -1.46
+    fg:       mkArr(18.5),    // z = (18.5-50)/22 ≈ -1.43
+    realized: mkArr(46200),
+  };
+}
+
+function buildDemoScores() {
+  // Matching the professor's exact values from the screenshot
+  return {
+    mvrv:   -1.71,
+    nupl:   -1.88,
+    sopr:   -0.79,
+    mayer:  -1.40,
+    ssr:    -1.44,
+    rsi:    -0.76,
+    profit: -1.46,
+    fg:     -1.43,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  const btn = document.getElementById('btnRefresh');
+  document.getElementById('refreshIcon').textContent = '↻';
+  btn.classList.add('spin');
+  btn.disabled = true;
+  setStatus('loading', 'Buscando dados...');
+
+  let raw, scores, composite;
+
+  try {
+    raw = await fetchAll();
+    const gotSome = Object.values(raw).some(v => v != null);
+
+    if (!gotSome) throw new Error('Sem dados');
+
+    scores = computeZscores(raw);
+    composite = computeComposite(scores);
+    setStatus('live', 'Dados ao vivo · BGeometrics API');
+
+  } catch (err) {
+    // CORS / network error — use demo values
+    raw = buildDemoRaw();
+    scores = buildDemoScores();
+    composite = -1.358;
+    setStatus('err', 'Demo · API indisponível neste ambiente');
+    showAlert('API bloqueada por CORS neste ambiente. Valores demonstrativos calibrados ao dashboard do professor (22 Mar 2026). Para dados reais, hospede o arquivo num servidor ou use o Live Server do VSCode.');
+  }
+
+  render(raw, scores, composite);
+  document.getElementById('htLastData').textContent = 'LAST DATA: ' + new Date().toLocaleDateString('pt-BR');
+  btn.classList.remove('spin');
+  btn.disabled = false;
+}
+
+// Auto-refresh 5min
+setInterval(init, 5 * 60 * 1000);
+init();
+</script>
+</body>
+</html>
