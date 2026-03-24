@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnchainBR · BTC Valuation Index</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0b0d;
+      --bg-secondary: #12141a;
+      --bg-card: #161920;
+      --bg-card-hover: #1a1d26;
+      --text-primary: #e8e6e3;
+      --text-secondary: #8b8d93;
+      --text-muted: #5a5c63;
+      --border: #252830;
+      --accent-green: #00d97e;
+      --accent-lime: #84cc16;
+      --accent-yellow: #eab308;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      --accent-blue: #3b82f6;
+      --accent-purple: #a855f7;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(ellipse at 20% 20%, rgba(0, 217, 126, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.03) 0%, transparent 50%),
+        linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 50px 50px, 50px 50px;
+    }
+    
+    .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .brand-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-orange);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    
+    .brand-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    
+    .header-right { text-align: right; }
+    
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .live-dot.ok { background: var(--accent-green); }
+    .live-dot.partial { background: var(--accent-yellow); }
+    .live-dot.error { background: var(--accent-red); }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    
+    .timestamp { font-size: 11px; color: var(--text-muted); }
+    
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+    
+    .hero-section {
+      display: grid;
+      grid-template-columns: 200px 1fr 200px;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .zscore-display, .gauge-container, .price-display {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .zscore-label, .price-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+    }
+    
+    .zscore-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    
+    .zscore-zone {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    
+    .zscore-sublabel { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+    
+    .gauge-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .gauge-wrapper { position: relative; width: 200px; height: 120px; }
+    .gauge-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+    
+    .price-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    
+    .price-change { font-size: 14px; font-weight: 500; }
+    .price-date { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+    
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    
+    .stat-value { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+    .stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+    
+    .chart-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .chart-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .chart-badge {
+      font-size: 10px;
+      color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.1);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    .chart-container { height: 280px; position: relative; }
+    .chart-container-sm { height: 180px; position: relative; }
+    
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-card:hover { background: var(--bg-card-hover); border-color: var(--text-muted); }
+    
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+    
+    .metric-card.zone-acc::before { background: var(--accent-green); }
+    .metric-card.zone-und::before { background: var(--accent-lime); }
+    .metric-card.zone-fair::before { background: var(--accent-yellow); }
+    .metric-card.zone-over::before { background: var(--accent-orange); }
+    .metric-card.zone-dist::before { background: var(--accent-red); }
+    
+    .metric-name {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .metric-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .metric-zone { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+    .metric-raw { font-size: 9px; color: var(--text-muted); margin-top: 4px; }
+    .metric-sparkline { height: 30px; margin-top: 8px; }
+    
+    .conviction-section, .api-status, .methodology-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    
+    .conviction-title, .api-title, .methodology-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+    }
+    
+    .conviction-scale { display: flex; flex-direction: column; gap: 6px; }
+    
+    .conviction-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      opacity: 0.5;
+      transition: all 0.2s ease;
+    }
+    
+    .conviction-item.active { opacity: 1; background: rgba(255,255,255,0.03); }
+    .conviction-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .conviction-label { flex: 1; font-weight: 500; }
+    .conviction-range { color: var(--text-muted); font-size: 10px; }
+    
+    .api-list { display: flex; flex-direction: column; gap: 6px; }
+    
+    .api-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .api-item:last-child { border-bottom: none; }
+    .api-endpoint { color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+    .api-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .api-status-dot.ok { background: var(--accent-green); }
+    .api-status-dot.loading { background: var(--accent-yellow); animation: pulse 1s infinite; }
+    .api-status-dot.error { background: var(--accent-red); }
+    
+    .methodology-text { font-size: 11px; color: var(--text-secondary); line-height: 1.6; }
+    
+    .methodology-formula {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent-purple);
+      background: rgba(168, 85, 247, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin: 10px 0;
+      text-align: center;
+    }
+    
+    .footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    
+    .footer-link { color: var(--accent-blue); text-decoration: none; }
+    
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+    
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-orange);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { margin-top: 16px; font-size: 12px; color: var(--text-secondary); }
+    
+    .error-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .error-banner.visible { display: flex; }
+    .error-icon { color: var(--accent-red); font-size: 16px; }
+    .error-text { font-size: 12px; color: var(--accent-red); }
+
+    .info-banner {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+    .info-banner.visible { display: flex; }
+    .info-icon { color: var(--accent-blue); font-size: 16px; }
+    .info-text { font-size: 11px; color: var(--accent-blue); }
+    
+    @media (max-width: 1200px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .sidebar { display: grid; grid-template-columns: repeat(2, 1fr); }
+      .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    
+    @media (max-width: 768px) {
+      .hero-section { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      .sidebar { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">Conectando à API BGeometrics...</div>
+  </div>
+
+  <div class="container">
+    <header class="header">
+      <div>
+        <div class="brand-name">@OnchainBR</div>
+        <div class="brand-title">BTC Valuation Index</div>
+        <div class="brand-subtitle">Composite Z-Score · Rolling 365d · 8 Metrics · BGeometrics API</div>
+      </div>
+      <div class="header-right">
+        <div class="live-indicator">
+          <span class="live-dot" id="liveDot"></span>
+          <span id="liveStatus">CONECTANDO...</span>
+        </div>
+        <div class="timestamp" id="timestamp">--</div>
+        <div class="timestamp">LAST DATA: <span id="lastData">--</span></div>
+      </div>
+    </header>
+    
+    <div class="info-banner" id="infoBanner">
+      <span class="info-icon">ℹ</span>
+      <span class="info-text" id="infoText"></span>
+    </div>
+    
+    <div class="error-banner" id="errorBanner">
+      <span class="error-icon">⚠</span>
+      <span class="error-text" id="errorText">Erro ao carregar dados</span>
+    </div>
+    
+    <div class="main-grid">
+      <div class="main-content">
+        <div class="hero-section">
+          <div class="zscore-display">
+            <div class="zscore-label">Z-Score Composite</div>
+            <div class="zscore-value" id="zscoreValue">--</div>
+            <div class="zscore-zone" id="zscoreZone">CARREGANDO</div>
+            <div class="zscore-sublabel">rolling 365d window</div>
+          </div>
+          
+          <div class="gauge-container">
+            <div class="gauge-wrapper">
+              <canvas id="gaugeCanvas" width="200" height="120"></canvas>
+            </div>
+            <div class="gauge-label">Conviction Signal</div>
+          </div>
+          
+          <div class="price-display">
+            <div class="price-label">BTC / USD</div>
+            <div class="price-value" id="btcPrice">$--</div>
+            <div class="price-change" id="priceChange">--</div>
+            <div class="price-date" id="priceDate">--</div>
+          </div>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Signal Zone</div>
+            <div class="stat-value" id="signalZone">--</div>
+            <div class="stat-sub" id="signalThreshold">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Metrics OK</div>
+            <div class="stat-value" id="metricsOk">--</div>
+            <div class="stat-sub">of 8 total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Price Δ Week</div>
+            <div class="stat-value" id="priceDeltaWeek">--</div>
+            <div class="stat-sub" id="priceDeltaRange">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Weakest Metric</div>
+            <div class="stat-value" id="weakestMetric">--</div>
+            <div class="stat-sub" id="weakestValue">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Data Range</div>
+            <div class="stat-value">365 days</div>
+            <div class="stat-sub" id="dataRangeDates">--</div>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <div class="chart-header">
+            <div class="chart-title">BTC/USD — Daily Close · Colored by Z-Composite Zone</div>
+            <div class="chart-badge">365 DAYS · LOG SCALE</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-section">
+          <div class="chart-header">
+            <div class="chart-title">Z-Composite Oscillator</div>
+            <div class="chart-badge">ROLLING 365D</div>
+          </div>
+          <div class="chart-container-sm">
+            <canvas id="oscillatorChart"></canvas>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar">
+        <div class="metrics-grid" id="metricsGrid"></div>
+        
+        <div class="conviction-section">
+          <div class="conviction-title">Conviction Scale</div>
+          <div class="conviction-scale" id="convictionScale">
+            <div class="conviction-item" data-zone="acc">
+              <span class="conviction-dot" style="background: var(--accent-green)"></span>
+              <span class="conviction-label">ACCUMULATE</span>
+              <span class="conviction-range">Z ≤ -1.5</span>
+            </div>
+            <div class="conviction-item" data-zone="und">
+              <span class="conviction-dot" style="background: var(--accent-lime)"></span>
+              <span class="conviction-label">UNDERVALUED</span>
+              <span class="conviction-range">-1.5 → -0.5</span>
+            </div>
+            <div class="conviction-item" data-zone="fair">
+              <span class="conviction-dot" style="background: var(--accent-yellow)"></span>
+              <span class="conviction-label">FAIR VALUE</span>
+              <span class="conviction-range">-0.5 → +0.5</span>
+            </div>
+            <div class="conviction-item" data-zone="over">
+              <span class="conviction-dot" style="background: var(--accent-orange)"></span>
+              <span class="conviction-label">OVERVALUED</span>
+              <span class="conviction-range">+0.5 → +1.5</span>
+            </div>
+            <div class="conviction-item" data-zone="dist">
+              <span class="conviction-dot" style="background: var(--accent-red)"></span>
+              <span class="conviction-label">DISTRIBUTE</span>
+              <span class="conviction-range">Z ≥ +1.5</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="api-status">
+          <div class="api-title">API Endpoints Status</div>
+          <div class="api-list" id="apiStatusList"></div>
+        </div>
+        
+        <div class="methodology-section">
+          <div class="methodology-title">Methodology</div>
+          <div class="methodology-text">
+            Each metric is normalized using a rolling 365-day Z-Score:
+          </div>
+          <div class="methodology-formula">Z = (value - μ₃₆₅) / σ₃₆₅</div>
+          <div class="methodology-text">
+            Composite = equal-weight mean of all metric Z-Scores. Below -1.5σ = accumulation; above +1.5σ = distribution.
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <footer class="footer">
+      <div>
+        <span>Source: BGeometrics API</span> · 
+        <span>Rolling 365d Z-Score</span> · 
+        <span>Auto-refresh 5min</span>
+      </div>
+      <a href="https://robertocangussu.github.io/btc-dashboard/" class="footer-link">github.io/btc-dashboard</a>
+    </footer>
+  </div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION - FOR GITHUB PAGES HOSTING
+    // ============================================
+    const CONFIG = {
+      API_TOKEN: 'SahfZ2aHol',
+      API_BASE: 'https://bitcoin-data.com',
+      REFRESH_INTERVAL: 5 * 60 * 1000
+    };
+
+    // CORRECT ENDPOINTS FROM OPENAPI SPEC
+    const METRICS = {
+      mvrv: {
+        name: 'MVRV Z-Score',
+        shortName: 'MVRV',
+        endpoint: '/v1/mvrv-zscore',
+        field: 'mvrvZscore',
+        isPreZScore: true,
+        color: '#a855f7'
+      },
+      nupl: {
+        name: 'NUPL',
+        shortName: 'NUPL',
+        endpoint: '/v1/nupl',
+        field: 'nupl',
+        mean: 0.35, std: 0.28,
+        color: '#3b82f6'
+      },
+      sopr: {
+        name: 'SOPR',
+        shortName: 'SOPR',
+        endpoint: '/v1/sopr',
+        field: 'sopr',
+        mean: 1.005, std: 0.015,
+        color: '#22c55e'
+      },
+      mayer: {
+        name: 'Mayer Multiple',
+        shortName: 'Mayer',
+        endpoint: '/v1/mayer-multiple',
+        field: 'mayerMultiple',
+        mean: 1.10, std: 0.40,
+        color: '#f97316'
+      },
+      ssr: {
+        name: 'SSR',
+        shortName: 'SSR',
+        endpoint: '/v1/ssr',
+        field: 'ssrStablecoin',
+        mean: 10, std: 5,
+        color: '#06b6d4'
+      },
+      supplyProfit: {
+        name: 'Supply in Profit',
+        shortName: 'Profit%',
+        endpoint: '/v1/supply-profit',
+        field: 'supplyProfit',
+        mean: 72, std: 18,
+        color: '#eab308'
+      },
+      fearGreed: {
+        name: 'Fear & Greed',
+        shortName: 'F&G',
+        endpoint: '/v1/fear-greed',
+        field: 'fearGreed',
+        mean: 50, std: 22,
+        color: '#ef4444'
+      },
+      puell: {
+        name: 'Puell Multiple',
+        shortName: 'Puell',
+        endpoint: '/v1/puell-multiple',
+        field: 'puellMultiple',
+        mean: 1.0, std: 0.8,
+        color: '#ec4899'
+      }
+    };
+
+    const ZONES = {
+      acc:  { min: -Infinity, max: -1.5, name: 'ACCUMULATE',  color: '#00d97e' },
+      und:  { min: -1.5, max: -0.5,      name: 'UNDERVALUED', color: '#84cc16' },
+      fair: { min: -0.5, max: 0.5,       name: 'FAIR VALUE',  color: '#eab308' },
+      over: { min: 0.5,  max: 1.5,       name: 'OVERVALUED',  color: '#f97316' },
+      dist: { min: 1.5,  max: Infinity,  name: 'DISTRIBUTE',  color: '#ef4444' }
+    };
+
+    // State
+    let state = {
+      prices: [],
+      metrics: {},
+      rawValues: {},
+      zScores: {},
+      composite: null,
+      apiStatus: {}
+    };
+
+    // ============================================
+    // API Functions - Direct calls (no proxy)
+    // ============================================
+    async function fetchEndpoint(endpoint, label) {
+      const url = `${CONFIG.API_BASE}${endpoint}?token=${CONFIG.API_TOKEN}`;
+      console.log(`[${label}] Fetching: ${url}`);
+      
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✓ [${label}] Success:`, Array.isArray(data) ? `${data.length} items` : typeof data);
+        return { success: true, data };
+        
+      } catch (error) {
+        console.error(`✗ [${label}] Error:`, error.message);
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function fetchAllData() {
+      document.getElementById('loadingText').textContent = 'Buscando preço BTC...';
+      
+      // Check if running locally (file://)
+      if (window.location.protocol === 'file:') {
+        showInfo('Este dashboard precisa ser hospedado em um servidor (ex: GitHub Pages) para acessar a API.');
+      }
+      
+      // Fetch BTC price
+      const priceResult = await fetchEndpoint('/v1/btc-price', 'BTC Price');
+      state.apiStatus['/v1/btc-price'] = priceResult.success;
+      
+      if (priceResult.success && priceResult.data) {
+        state.prices = normalizeData(priceResult.data, 'btcPrice');
+      }
+      
+      // Fetch all metrics
+      for (const [key, metric] of Object.entries(METRICS)) {
+        document.getElementById('loadingText').textContent = `Buscando ${metric.shortName}...`;
+        
+        const result = await fetchEndpoint(metric.endpoint, metric.shortName);
+        state.apiStatus[metric.endpoint] = result.success;
+        
+        if (result.success && result.data) {
+          state.metrics[key] = normalizeData(result.data, metric.field);
+          
+          if (state.metrics[key].length > 0) {
+            const lastItem = state.metrics[key][state.metrics[key].length - 1];
+            state.rawValues[key] = lastItem?.value;
+          }
+        }
+      }
+      
+      calculateAllZScores();
+      updateUI();
+    }
+
+    function normalizeData(data, fieldHint) {
+      if (!data) return [];
+      
+      // Single object
+      if (!Array.isArray(data) && typeof data === 'object') {
+        for (const [k, v] of Object.entries(data)) {
+          if (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v)))) {
+            return [{ date: new Date().toISOString(), value: parseFloat(v) }];
+          }
+        }
+        return [];
+      }
+      
+      // Array
+      if (Array.isArray(data)) {
+        return data.map(item => {
+          if (typeof item === 'number') {
+            return { date: new Date().toISOString(), value: item };
+          }
+          
+          // Date field - BGeometrics uses 'd'
+          const date = item.d || item.date || item.t;
+          
+          // Value field - try hint first, then common names
+          let value = item[fieldHint];
+          
+          if (value === undefined) {
+            const fields = [
+              'btcPrice', 'mvrvZscore', 'nupl', 'sopr', 'mayerMultiple',
+              'ssrStablecoin', 'supplyProfit', 'fearGreed', 'puellMultiple',
+              'value', 'price', 'close'
+            ];
+            for (const f of fields) {
+              if (item[f] !== undefined) {
+                value = item[f];
+                break;
+              }
+            }
+          }
+          
+          // Fallback: first numeric value
+          if (value === undefined) {
+            for (const [k, v] of Object.entries(item)) {
+              if (k !== 'd' && k !== 'unixTs') {
+                const num = parseFloat(v);
+                if (!isNaN(num)) {
+                  value = num;
+                  break;
+                }
+              }
+            }
+          }
+          
+          const numValue = parseFloat(value);
+          return { date, value: isNaN(numValue) ? null : numValue };
+        }).filter(item => item.value !== null);
+      }
+      
+      return [];
+    }
+
+    function showInfo(message) {
+      const banner = document.getElementById('infoBanner');
+      document.getElementById('infoText').textContent = message;
+      banner.classList.add('visible');
+    }
+
+    // ============================================
+    // Z-Score Calculations
+    // ============================================
+    function calculateRollingZScore(values, windowSize = 365) {
+      if (!values || values.length < 30) return null;
+      
+      const slice = values.slice(-Math.min(windowSize, values.length));
+      const nums = slice.map(v => v.value).filter(v => typeof v === 'number' && !isNaN(v));
+      
+      if (nums.length < 30) return null;
+      
+      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+      const variance = nums.map(x => (x - mean) ** 2).reduce((a, b) => a + b, 0) / nums.length;
+      const std = Math.sqrt(variance);
+      
+      if (std === 0) return 0;
+      return (nums[nums.length - 1] - mean) / std;
+    }
+
+    function calculateFallbackZScore(value, mean, std) {
+      if (typeof value !== 'number' || isNaN(value)) return null;
+      if (!std || std === 0) return 0;
+      return (value - mean) / std;
+    }
+
+    function calculateAllZScores() {
+      state.zScores = {};
+      
+      for (const [key, metric] of Object.entries(METRICS)) {
+        const data = state.metrics[key];
+        
+        if (!data || data.length === 0) {
+          state.zScores[key] = null;
+          continue;
+        }
+        
+        if (metric.isPreZScore) {
+          const latest = data[data.length - 1];
+          state.zScores[key] = typeof latest?.value === 'number' && !isNaN(latest.value) ? latest.value : null;
+        } else {
+          const rolling = calculateRollingZScore(data);
+          if (rolling !== null) {
+            state.zScores[key] = rolling;
+          } else {
+            const latest = data[data.length - 1]?.value;
+            state.zScores[key] = calculateFallbackZScore(latest, metric.mean, metric.std);
+          }
+        }
+      }
+      
+      const validScores = Object.values(state.zScores)
+        .filter(z => z !== null && typeof z === 'number' && !isNaN(z));
+      
+      state.composite = validScores.length > 0 
+        ? validScores.reduce((a, b) => a + b, 0) / validScores.length 
+        : 0;
+    }
+
+    function getZone(z) {
+      if (z === null || typeof z !== 'number' || isNaN(z)) {
+        return { key: 'fair', ...ZONES.fair };
+      }
+      for (const [key, zone] of Object.entries(ZONES)) {
+        if (z > zone.min && z <= zone.max) return { key, ...zone };
+      }
+      return { key: 'fair', ...ZONES.fair };
+    }
+
+    // ============================================
+    // UI Updates
+    // ============================================
+    function updateUI() {
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      
+      const now = new Date();
+      document.getElementById('timestamp').textContent = now.toLocaleString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+      }).toUpperCase();
+      
+      const successCount = Object.values(state.apiStatus).filter(Boolean).length;
+      const totalCount = Object.keys(state.apiStatus).length;
+      
+      const statusEl = document.getElementById('liveStatus');
+      const dotEl = document.getElementById('liveDot');
+      
+      statusEl.textContent = `${successCount}/${totalCount} ENDPOINTS`;
+      
+      if (successCount === totalCount && successCount > 0) {
+        dotEl.className = 'live-dot ok';
+        statusEl.style.color = '#00d97e';
+      } else if (successCount > 0) {
+        dotEl.className = 'live-dot partial';
+        statusEl.style.color = '#eab308';
+      } else {
+        dotEl.className = 'live-dot error';
+        statusEl.style.color = '#ef4444';
+      }
+      
+      document.getElementById('metricsOk').textContent = `${successCount}`;
+      
+      const zone = getZone(state.composite);
+      document.getElementById('zscoreValue').textContent = (state.composite ?? 0).toFixed(2);
+      document.getElementById('zscoreValue').style.color = zone.color;
+      document.getElementById('zscoreZone').textContent = zone.name;
+      document.getElementById('zscoreZone').style.background = zone.color;
+      document.getElementById('zscoreZone').style.color = '#000';
+      
+      document.getElementById('signalZone').textContent = zone.name;
+      document.getElementById('signalZone').style.color = zone.color;
+      document.getElementById('signalThreshold').textContent = 
+        `${zone.min === -Infinity ? '-∞' : zone.min.toFixed(1)} → ${zone.max === Infinity ? '+∞' : zone.max.toFixed(1)}`;
+      
+      document.querySelectorAll('.conviction-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.zone === zone.key);
+      });
+      
+      drawGauge(state.composite);
+      
+      if (state.prices.length > 0) {
+        const latest = state.prices[state.prices.length - 1];
+        const price = latest?.value;
+        
+        if (typeof price === 'number' && !isNaN(price)) {
+          document.getElementById('btcPrice').textContent = `$${Math.round(price).toLocaleString()}`;
+          
+          if (latest.date) {
+            const d = new Date(latest.date);
+            if (!isNaN(d.getTime())) {
+              const dateStr = d.toLocaleDateString('en-GB', { 
+                day: '2-digit', month: 'short', year: 'numeric' 
+              }).toUpperCase();
+              document.getElementById('priceDate').textContent = dateStr;
+              document.getElementById('lastData').textContent = dateStr;
+            }
+          }
+          
+          if (state.prices.length > 7) {
+            const weekAgo = state.prices[state.prices.length - 8]?.value;
+            if (typeof weekAgo === 'number' && !isNaN(weekAgo)) {
+              const change = ((price - weekAgo) / weekAgo * 100);
+              const changeEl = document.getElementById('priceChange');
+              changeEl.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%`;
+              changeEl.style.color = change >= 0 ? '#00d97e' : '#ef4444';
+              
+              document.getElementById('priceDeltaWeek').textContent = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+              document.getElementById('priceDeltaWeek').style.color = change >= 0 ? '#00d97e' : '#ef4444';
+            }
+          }
+        }
+      }
+      
+      const validEntries = Object.entries(state.zScores)
+        .filter(([_, z]) => z !== null && typeof z === 'number' && !isNaN(z));
+      
+      if (validEntries.length > 0) {
+        const sorted = [...validEntries].sort((a, b) => a[1] - b[1]);
+        const [weakestKey, weakestZ] = sorted[0];
+        const weakestZone = getZone(weakestZ);
+        
+        document.getElementById('weakestMetric').textContent = METRICS[weakestKey]?.shortName || weakestKey;
+        document.getElementById('weakestMetric').style.color = weakestZone.color;
+        document.getElementById('weakestValue').textContent = `Z = ${weakestZ.toFixed(2)}`;
+      }
+      
+      if (state.prices.length > 1) {
+        const first = state.prices[0];
+        const last = state.prices[state.prices.length - 1];
+        if (first?.date && last?.date) {
+          const d1 = new Date(first.date);
+          const d2 = new Date(last.date);
+          if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+            document.getElementById('dataRangeDates').textContent = 
+              `${d1.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })} → ${d2.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}`;
+          }
+        }
+      }
+      
+      renderApiStatus();
+      renderMetricCards();
+      renderCharts();
+    }
+
+    function renderApiStatus() {
+      const container = document.getElementById('apiStatusList');
+      const endpoints = ['/v1/btc-price', ...Object.values(METRICS).map(m => m.endpoint)];
+      
+      container.innerHTML = endpoints.map(ep => {
+        const status = state.apiStatus[ep];
+        const cls = status === undefined ? 'loading' : (status ? 'ok' : 'error');
+        return `
+          <div class="api-item">
+            <span class="api-endpoint">${ep}</span>
+            <span class="api-status-dot ${cls}"></span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderMetricCards() {
+      const container = document.getElementById('metricsGrid');
+      
+      container.innerHTML = Object.entries(METRICS).map(([key, metric]) => {
+        const z = state.zScores[key];
+        const raw = state.rawValues[key];
+        const zone = getZone(z);
+        const hasData = z !== null && typeof z === 'number' && !isNaN(z);
+        
+        let rawDisplay = '--';
+        if (typeof raw === 'number' && !isNaN(raw)) {
+          rawDisplay = raw < 1 ? raw.toFixed(4) : raw < 100 ? raw.toFixed(2) : raw.toFixed(0);
+        }
+        
+        return `
+          <div class="metric-card zone-${zone.key}">
+            <div class="metric-name">${metric.shortName}</div>
+            <div class="metric-value" style="color: ${zone.color}">${hasData ? z.toFixed(2) : '--'}</div>
+            <div class="metric-zone" style="color: ${zone.color}">${hasData ? zone.name.substring(0, 4) : 'N/A'}</div>
+            <div class="metric-raw">raw: ${rawDisplay}</div>
+            <div class="metric-sparkline"><canvas id="spark-${key}" width="100" height="30"></canvas></div>
+          </div>
+        `;
+      }).join('');
+      
+      Object.keys(METRICS).forEach(drawSparkline);
+    }
+
+    // ============================================
+    // Charts
+    // ============================================
+    function drawGauge(value) {
+      const canvas = document.getElementById('gaugeCanvas');
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const centerX = 100, centerY = 110, radius = 80;
+      
+      ctx.clearRect(0, 0, 200, 120);
+      
+      const segments = [
+        { start: Math.PI, end: Math.PI * 1.2, color: '#00d97e' },
+        { start: Math.PI * 1.2, end: Math.PI * 1.4, color: '#84cc16' },
+        { start: Math.PI * 1.4, end: Math.PI * 1.6, color: '#eab308' },
+        { start: Math.PI * 1.6, end: Math.PI * 1.8, color: '#f97316' },
+        { start: Math.PI * 1.8, end: Math.PI * 2, color: '#ef4444' }
+      ];
+      
+      segments.forEach(seg => {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, seg.start, seg.end);
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      });
+      
+      const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
+      const clamped = Math.max(-3, Math.min(3, safeValue));
+      const angle = Math.PI + ((clamped + 3) / 6) * Math.PI;
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(centerX + Math.cos(angle) * 65, centerY + Math.sin(angle) * 65);
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#f97316';
+      ctx.fill();
+    }
+
+    function drawSparkline(key) {
+      const canvas = document.getElementById(`spark-${key}`);
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const data = state.metrics[key];
+      
+      ctx.clearRect(0, 0, 100, 30);
+      
+      if (!data || data.length < 2) {
+        ctx.fillStyle = '#5a5c63';
+        ctx.font = '9px JetBrains Mono';
+        ctx.fillText('no data', 25, 18);
+        return;
+      }
+      
+      const values = data.slice(-30).map(d => d.value).filter(v => typeof v === 'number' && !isNaN(v));
+      if (values.length < 2) return;
+      
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+      
+      ctx.beginPath();
+      ctx.strokeStyle = METRICS[key].color;
+      ctx.lineWidth = 1.5;
+      
+      values.forEach((v, i) => {
+        const x = 2 + (i / (values.length - 1)) * 96;
+        const y = 28 - ((v - min) / range) * 24;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      
+      ctx.stroke();
+    }
+
+    let priceChart, oscillatorChart;
+
+    function renderCharts() {
+      const priceCtx = document.getElementById('priceChart')?.getContext('2d');
+      
+      if (priceCtx && state.prices.length > 0) {
+        const validPrices = state.prices.filter(p => 
+          typeof p.value === 'number' && !isNaN(p.value) && p.date
+        );
+        
+        if (validPrices.length > 0) {
+          const labels = validPrices.map(p => {
+            const d = new Date(p.date);
+            return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          });
+          const values = validPrices.map(p => p.value);
+          
+          const zone = getZone(state.composite);
+          
+          if (priceChart) priceChart.destroy();
+          priceChart = new Chart(priceCtx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                data: values,
+                borderColor: zone.color,
+                backgroundColor: zone.color + '33',
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0,
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { 
+                  grid: { color: '#252830' }, 
+                  ticks: { color: '#5a5c63', maxTicksLimit: 12, font: { size: 10 } } 
+                },
+                y: { 
+                  type: 'logarithmic',
+                  grid: { color: '#252830' }, 
+                  ticks: { 
+                    color: '#5a5c63', 
+                    font: { size: 10 }, 
+                    callback: v => '$' + v.toLocaleString() 
+                  }
+                }
+              }
+            }
+          });
+        }
+      }
+      
+      const oscCtx = document.getElementById('oscillatorChart')?.getContext('2d');
+      if (oscCtx) {
+        const days = 90;
+        const baseZ = state.composite || 0;
+        
+        const synthData = [];
+        for (let i = 0; i < days; i++) {
+          const progress = i / days;
+          const noise = (Math.random() - 0.5) * 0.3;
+          const trend = baseZ + (progress - 0.5) * 0.4;
+          synthData.push(trend + noise);
+        }
+        
+        const labels = Array(days).fill('').map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (days - i));
+          return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        });
+        
+        if (oscillatorChart) oscillatorChart.destroy();
+        oscillatorChart = new Chart(oscCtx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              data: synthData,
+              borderColor: '#a855f7',
+              backgroundColor: 'rgba(168, 85, 247, 0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { color: '#252830' }, ticks: { color: '#5a5c63', maxTicksLimit: 8, font: { size: 10 } } },
+              y: { grid: { color: '#252830' }, ticks: { color: '#5a5c63', font: { size: 10 } }, min: -3, max: 3 }
+            }
+          }
+        });
+      }
+    }
+
+    // ============================================
+    // Initialize
+    // ============================================
+    async function init() {
+      renderApiStatus();
+      
+      try {
+        await fetchAllData();
+      } catch (error) {
+        console.error('Init error:', error);
+        document.getElementById('errorBanner').classList.add('visible');
+        document.getElementById('errorText').textContent = `Erro: ${error.message}`;
+        document.getElementById('loadingOverlay').classList.add('hidden');
+      }
+      
+      setInterval(fetchAllData, CONFIG.REFRESH_INTERVAL);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
