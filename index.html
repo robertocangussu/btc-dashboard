@@ -80,17 +80,19 @@
       align-items: center;
       gap: 6px;
       font-size: 11px;
-      color: var(--accent-green);
       margin-bottom: 4px;
     }
     
     .live-dot {
       width: 6px;
       height: 6px;
-      background: var(--accent-green);
       border-radius: 50%;
       animation: pulse 2s infinite;
     }
+    
+    .live-dot.ok { background: var(--accent-green); }
+    .live-dot.partial { background: var(--accent-yellow); }
+    .live-dot.error { background: var(--accent-red); }
     
     @keyframes pulse {
       0%, 100% { opacity: 1; }
@@ -279,6 +281,7 @@
     }
     
     .metric-zone { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+    .metric-raw { font-size: 9px; color: var(--text-muted); margin-top: 4px; }
     .metric-sparkline { height: 30px; margin-top: 8px; }
     
     .conviction-section, .api-status, .methodology-section {
@@ -401,6 +404,20 @@
     .error-banner.visible { display: flex; }
     .error-icon { color: var(--accent-red); font-size: 16px; }
     .error-text { font-size: 12px; color: var(--accent-red); }
+
+    .info-banner {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+    .info-banner.visible { display: flex; }
+    .info-icon { color: var(--accent-blue); font-size: 16px; }
+    .info-text { font-size: 11px; color: var(--accent-blue); }
     
     @media (max-width: 1200px) {
       .main-grid { grid-template-columns: 1fr; }
@@ -431,13 +448,18 @@
       </div>
       <div class="header-right">
         <div class="live-indicator">
-          <span class="live-dot"></span>
+          <span class="live-dot" id="liveDot"></span>
           <span id="liveStatus">CONECTANDO...</span>
         </div>
         <div class="timestamp" id="timestamp">--</div>
         <div class="timestamp">LAST DATA: <span id="lastData">--</span></div>
       </div>
     </header>
+    
+    <div class="info-banner" id="infoBanner">
+      <span class="info-icon">ℹ</span>
+      <span class="info-text" id="infoText"></span>
+    </div>
     
     <div class="error-banner" id="errorBanner">
       <span class="error-icon">⚠</span>
@@ -582,69 +604,77 @@
 
   <script>
     // ============================================
-    // CONFIGURATION - BGeometrics API
+    // CONFIGURATION - FOR GITHUB PAGES HOSTING
     // ============================================
     const CONFIG = {
       API_TOKEN: 'SahfZ2aHol',
-      API_BASE: 'https://bitcoin-data.com/v1',
+      API_BASE: 'https://bitcoin-data.com',
       REFRESH_INTERVAL: 5 * 60 * 1000
     };
 
-    // Corrected endpoint names based on BGeometrics documentation
+    // CORRECT ENDPOINTS FROM OPENAPI SPEC
     const METRICS = {
       mvrv: {
         name: 'MVRV Z-Score',
         shortName: 'MVRV',
-        endpoint: '/mvrv-zscore',
+        endpoint: '/v1/mvrv-zscore',
+        field: 'mvrvZscore',
         isPreZScore: true,
         color: '#a855f7'
       },
       nupl: {
         name: 'NUPL',
         shortName: 'NUPL',
-        endpoint: '/nupl',
+        endpoint: '/v1/nupl',
+        field: 'nupl',
         mean: 0.35, std: 0.28,
         color: '#3b82f6'
       },
       sopr: {
         name: 'SOPR',
         shortName: 'SOPR',
-        endpoint: '/sopr',
+        endpoint: '/v1/sopr',
+        field: 'sopr',
         mean: 1.005, std: 0.015,
         color: '#22c55e'
       },
       mayer: {
         name: 'Mayer Multiple',
         shortName: 'Mayer',
-        endpoint: '/mayer-multiple',  // FIXED: was /mayer
+        endpoint: '/v1/mayer-multiple',
+        field: 'mayerMultiple',
         mean: 1.10, std: 0.40,
         color: '#f97316'
       },
       ssr: {
-        name: 'Stablecoin Ratio',
+        name: 'SSR',
         shortName: 'SSR',
-        endpoint: '/ssr',
+        endpoint: '/v1/ssr',
+        field: 'ssrStablecoin',
         mean: 10, std: 5,
         color: '#06b6d4'
       },
       supplyProfit: {
         name: 'Supply in Profit',
         shortName: 'Profit%',
-        endpoint: '/supply-in-profit',  // FIXED: was /supply-profit
+        endpoint: '/v1/supply-profit',
+        field: 'supplyProfit',
         mean: 72, std: 18,
         color: '#eab308'
       },
       fearGreed: {
         name: 'Fear & Greed',
         shortName: 'F&G',
-        endpoint: '/fear-and-greed',  // FIXED: was /fear-greed
+        endpoint: '/v1/fear-greed',
+        field: 'fearGreed',
         mean: 50, std: 22,
         color: '#ef4444'
       },
       puell: {
         name: 'Puell Multiple',
         shortName: 'Puell',
-        endpoint: '/puell-multiple',  // Added as alternative
+        endpoint: '/v1/puell-multiple',
+        field: 'puellMultiple',
         mean: 1.0, std: 0.8,
         color: '#ec4899'
       }
@@ -662,23 +692,37 @@
     let state = {
       prices: [],
       metrics: {},
+      rawValues: {},
       zScores: {},
       composite: null,
       apiStatus: {}
     };
 
     // ============================================
-    // API Functions
+    // API Functions - Direct calls (no proxy)
     // ============================================
-    async function fetchEndpoint(endpoint) {
+    async function fetchEndpoint(endpoint, label) {
       const url = `${CONFIG.API_BASE}${endpoint}?token=${CONFIG.API_TOKEN}`;
+      console.log(`[${label}] Fetching: ${url}`);
+      
       try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log(`✓ [${label}] Success:`, Array.isArray(data) ? `${data.length} items` : typeof data);
         return { success: true, data };
+        
       } catch (error) {
-        console.error(`Error ${endpoint}:`, error.message);
+        console.error(`✗ [${label}] Error:`, error.message);
         return { success: false, error: error.message };
       }
     }
@@ -686,28 +730,33 @@
     async function fetchAllData() {
       document.getElementById('loadingText').textContent = 'Buscando preço BTC...';
       
-      // Try multiple price endpoints
-      let priceResult = await fetchEndpoint('/btc-price');
-      if (!priceResult.success) {
-        priceResult = await fetchEndpoint('/price');
-      }
-      if (!priceResult.success) {
-        priceResult = await fetchEndpoint('/ohlc');
-      }
-      state.apiStatus['/price'] = priceResult.success;
-      
-      if (priceResult.success) {
-        state.prices = normalizeData(priceResult.data);
+      // Check if running locally (file://)
+      if (window.location.protocol === 'file:') {
+        showInfo('Este dashboard precisa ser hospedado em um servidor (ex: GitHub Pages) para acessar a API.');
       }
       
-      // Fetch metrics
+      // Fetch BTC price
+      const priceResult = await fetchEndpoint('/v1/btc-price', 'BTC Price');
+      state.apiStatus['/v1/btc-price'] = priceResult.success;
+      
+      if (priceResult.success && priceResult.data) {
+        state.prices = normalizeData(priceResult.data, 'btcPrice');
+      }
+      
+      // Fetch all metrics
       for (const [key, metric] of Object.entries(METRICS)) {
         document.getElementById('loadingText').textContent = `Buscando ${metric.shortName}...`;
-        const result = await fetchEndpoint(metric.endpoint);
+        
+        const result = await fetchEndpoint(metric.endpoint, metric.shortName);
         state.apiStatus[metric.endpoint] = result.success;
         
-        if (result.success) {
-          state.metrics[key] = normalizeData(result.data);
+        if (result.success && result.data) {
+          state.metrics[key] = normalizeData(result.data, metric.field);
+          
+          if (state.metrics[key].length > 0) {
+            const lastItem = state.metrics[key][state.metrics[key].length - 1];
+            state.rawValues[key] = lastItem?.value;
+          }
         }
       }
       
@@ -715,32 +764,80 @@
       updateUI();
     }
 
-    function normalizeData(data) {
+    function normalizeData(data, fieldHint) {
       if (!data) return [];
-      if (Array.isArray(data)) {
-        return data.map(item => ({
-          date: item.date || item.t || item.time || item.timestamp,
-          value: item.value ?? item.price ?? item.v ?? item.close ?? item
-        }));
+      
+      // Single object
+      if (!Array.isArray(data) && typeof data === 'object') {
+        for (const [k, v] of Object.entries(data)) {
+          if (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v)))) {
+            return [{ date: new Date().toISOString(), value: parseFloat(v) }];
+          }
+        }
+        return [];
       }
-      // Single value
-      return [{ date: new Date().toISOString(), value: data.value ?? data.price ?? data }];
+      
+      // Array
+      if (Array.isArray(data)) {
+        return data.map(item => {
+          if (typeof item === 'number') {
+            return { date: new Date().toISOString(), value: item };
+          }
+          
+          // Date field - BGeometrics uses 'd'
+          const date = item.d || item.date || item.t;
+          
+          // Value field - try hint first, then common names
+          let value = item[fieldHint];
+          
+          if (value === undefined) {
+            const fields = [
+              'btcPrice', 'mvrvZscore', 'nupl', 'sopr', 'mayerMultiple',
+              'ssrStablecoin', 'supplyProfit', 'fearGreed', 'puellMultiple',
+              'value', 'price', 'close'
+            ];
+            for (const f of fields) {
+              if (item[f] !== undefined) {
+                value = item[f];
+                break;
+              }
+            }
+          }
+          
+          // Fallback: first numeric value
+          if (value === undefined) {
+            for (const [k, v] of Object.entries(item)) {
+              if (k !== 'd' && k !== 'unixTs') {
+                const num = parseFloat(v);
+                if (!isNaN(num)) {
+                  value = num;
+                  break;
+                }
+              }
+            }
+          }
+          
+          const numValue = parseFloat(value);
+          return { date, value: isNaN(numValue) ? null : numValue };
+        }).filter(item => item.value !== null);
+      }
+      
+      return [];
+    }
+
+    function showInfo(message) {
+      const banner = document.getElementById('infoBanner');
+      document.getElementById('infoText').textContent = message;
+      banner.classList.add('visible');
     }
 
     // ============================================
     // Z-Score Calculations
     // ============================================
-    function calculateZScore(values, mean, std) {
-      if (!values || values.length === 0) return null;
-      const latest = values[values.length - 1].value;
-      if (typeof latest !== 'number' || isNaN(latest)) return null;
-      return (latest - mean) / std;
-    }
-
-    function calculateRollingZScore(values, window = 365) {
-      if (!values || values.length < 30) return null; // Need at least 30 days
+    function calculateRollingZScore(values, windowSize = 365) {
+      if (!values || values.length < 30) return null;
       
-      const slice = values.slice(-Math.min(window, values.length));
+      const slice = values.slice(-Math.min(windowSize, values.length));
       const nums = slice.map(v => v.value).filter(v => typeof v === 'number' && !isNaN(v));
       
       if (nums.length < 30) return null;
@@ -751,6 +848,12 @@
       
       if (std === 0) return 0;
       return (nums[nums.length - 1] - mean) / std;
+    }
+
+    function calculateFallbackZScore(value, mean, std) {
+      if (typeof value !== 'number' || isNaN(value)) return null;
+      if (!std || std === 0) return 0;
+      return (value - mean) / std;
     }
 
     function calculateAllZScores() {
@@ -765,23 +868,31 @@
         }
         
         if (metric.isPreZScore) {
-          // API returns Z-Score directly
           const latest = data[data.length - 1];
-          state.zScores[key] = typeof latest.value === 'number' ? latest.value : null;
+          state.zScores[key] = typeof latest?.value === 'number' && !isNaN(latest.value) ? latest.value : null;
         } else {
-          // Try rolling first, fallback to fixed params
           const rolling = calculateRollingZScore(data);
-          state.zScores[key] = rolling !== null ? rolling : calculateZScore(data, metric.mean, metric.std);
+          if (rolling !== null) {
+            state.zScores[key] = rolling;
+          } else {
+            const latest = data[data.length - 1]?.value;
+            state.zScores[key] = calculateFallbackZScore(latest, metric.mean, metric.std);
+          }
         }
       }
       
-      // Composite
-      const valid = Object.values(state.zScores).filter(z => z !== null && typeof z === 'number' && !isNaN(z));
-      state.composite = valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+      const validScores = Object.values(state.zScores)
+        .filter(z => z !== null && typeof z === 'number' && !isNaN(z));
+      
+      state.composite = validScores.length > 0 
+        ? validScores.reduce((a, b) => a + b, 0) / validScores.length 
+        : 0;
     }
 
     function getZone(z) {
-      if (z === null || isNaN(z)) return { key: 'fair', ...ZONES.fair };
+      if (z === null || typeof z !== 'number' || isNaN(z)) {
+        return { key: 'fair', ...ZONES.fair };
+      }
       for (const [key, zone] of Object.entries(ZONES)) {
         if (z > zone.min && z <= zone.max) return { key, ...zone };
       }
@@ -794,22 +905,35 @@
     function updateUI() {
       document.getElementById('loadingOverlay').classList.add('hidden');
       
-      // Timestamp
       const now = new Date();
       document.getElementById('timestamp').textContent = now.toLocaleString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
       }).toUpperCase();
       
-      // Count successful endpoints
       const successCount = Object.values(state.apiStatus).filter(Boolean).length;
       const totalCount = Object.keys(state.apiStatus).length;
-      document.getElementById('liveStatus').textContent = `${successCount}/${totalCount} ENDPOINTS`;
+      
+      const statusEl = document.getElementById('liveStatus');
+      const dotEl = document.getElementById('liveDot');
+      
+      statusEl.textContent = `${successCount}/${totalCount} ENDPOINTS`;
+      
+      if (successCount === totalCount && successCount > 0) {
+        dotEl.className = 'live-dot ok';
+        statusEl.style.color = '#00d97e';
+      } else if (successCount > 0) {
+        dotEl.className = 'live-dot partial';
+        statusEl.style.color = '#eab308';
+      } else {
+        dotEl.className = 'live-dot error';
+        statusEl.style.color = '#ef4444';
+      }
+      
       document.getElementById('metricsOk').textContent = `${successCount}`;
       
-      // Z-Score display
       const zone = getZone(state.composite);
-      document.getElementById('zscoreValue').textContent = state.composite.toFixed(2);
+      document.getElementById('zscoreValue').textContent = (state.composite ?? 0).toFixed(2);
       document.getElementById('zscoreValue').style.color = zone.color;
       document.getElementById('zscoreZone').textContent = zone.name;
       document.getElementById('zscoreZone').style.background = zone.color;
@@ -817,38 +941,37 @@
       
       document.getElementById('signalZone').textContent = zone.name;
       document.getElementById('signalZone').style.color = zone.color;
-      document.getElementById('signalThreshold').textContent = `${zone.min === -Infinity ? '-∞' : zone.min.toFixed(1)} → ${zone.max === Infinity ? '+∞' : zone.max.toFixed(1)}`;
+      document.getElementById('signalThreshold').textContent = 
+        `${zone.min === -Infinity ? '-∞' : zone.min.toFixed(1)} → ${zone.max === Infinity ? '+∞' : zone.max.toFixed(1)}`;
       
-      // Conviction scale
       document.querySelectorAll('.conviction-item').forEach(item => {
         item.classList.toggle('active', item.dataset.zone === zone.key);
       });
       
-      // Gauge
       drawGauge(state.composite);
       
-      // BTC Price
       if (state.prices.length > 0) {
         const latest = state.prices[state.prices.length - 1];
-        const price = latest.value;
+        const price = latest?.value;
+        
         if (typeof price === 'number' && !isNaN(price)) {
           document.getElementById('btcPrice').textContent = `$${Math.round(price).toLocaleString()}`;
           
           if (latest.date) {
             const d = new Date(latest.date);
-            document.getElementById('priceDate').textContent = d.toLocaleDateString('en-GB', { 
-              day: '2-digit', month: 'short', year: 'numeric' 
-            }).toUpperCase();
-            document.getElementById('lastData').textContent = d.toLocaleDateString('en-GB', { 
-              day: '2-digit', month: 'short', year: 'numeric' 
-            }).toUpperCase();
+            if (!isNaN(d.getTime())) {
+              const dateStr = d.toLocaleDateString('en-GB', { 
+                day: '2-digit', month: 'short', year: 'numeric' 
+              }).toUpperCase();
+              document.getElementById('priceDate').textContent = dateStr;
+              document.getElementById('lastData').textContent = dateStr;
+            }
           }
           
-          // Weekly change
           if (state.prices.length > 7) {
-            const weekPrice = state.prices[state.prices.length - 8].value;
-            if (typeof weekPrice === 'number') {
-              const change = ((price - weekPrice) / weekPrice * 100);
+            const weekAgo = state.prices[state.prices.length - 8]?.value;
+            if (typeof weekAgo === 'number' && !isNaN(weekAgo)) {
+              const change = ((price - weekAgo) / weekAgo * 100);
               const changeEl = document.getElementById('priceChange');
               changeEl.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%`;
               changeEl.style.color = change >= 0 ? '#00d97e' : '#ef4444';
@@ -860,25 +983,29 @@
         }
       }
       
-      // Weakest metric - FIXED BUG
       const validEntries = Object.entries(state.zScores)
         .filter(([_, z]) => z !== null && typeof z === 'number' && !isNaN(z));
       
       if (validEntries.length > 0) {
-        const sorted = validEntries.sort((a, b) => a[1] - b[1]);
+        const sorted = [...validEntries].sort((a, b) => a[1] - b[1]);
         const [weakestKey, weakestZ] = sorted[0];
-        document.getElementById('weakestMetric').textContent = METRICS[weakestKey].shortName;
-        document.getElementById('weakestMetric').style.color = getZone(weakestZ).color;
+        const weakestZone = getZone(weakestZ);
+        
+        document.getElementById('weakestMetric').textContent = METRICS[weakestKey]?.shortName || weakestKey;
+        document.getElementById('weakestMetric').style.color = weakestZone.color;
         document.getElementById('weakestValue').textContent = `Z = ${weakestZ.toFixed(2)}`;
       }
       
-      // Date range
-      if (state.prices.length > 0) {
+      if (state.prices.length > 1) {
         const first = state.prices[0];
         const last = state.prices[state.prices.length - 1];
-        if (first.date && last.date) {
-          document.getElementById('dataRangeDates').textContent = 
-            `${new Date(first.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })} → ${new Date(last.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}`;
+        if (first?.date && last?.date) {
+          const d1 = new Date(first.date);
+          const d2 = new Date(last.date);
+          if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+            document.getElementById('dataRangeDates').textContent = 
+              `${d1.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })} → ${d2.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}`;
+          }
         }
       }
       
@@ -889,7 +1016,7 @@
 
     function renderApiStatus() {
       const container = document.getElementById('apiStatusList');
-      const endpoints = ['/price', ...Object.values(METRICS).map(m => m.endpoint)];
+      const endpoints = ['/v1/btc-price', ...Object.values(METRICS).map(m => m.endpoint)];
       
       container.innerHTML = endpoints.map(ep => {
         const status = state.apiStatus[ep];
@@ -908,20 +1035,26 @@
       
       container.innerHTML = Object.entries(METRICS).map(([key, metric]) => {
         const z = state.zScores[key];
+        const raw = state.rawValues[key];
         const zone = getZone(z);
         const hasData = z !== null && typeof z === 'number' && !isNaN(z);
+        
+        let rawDisplay = '--';
+        if (typeof raw === 'number' && !isNaN(raw)) {
+          rawDisplay = raw < 1 ? raw.toFixed(4) : raw < 100 ? raw.toFixed(2) : raw.toFixed(0);
+        }
         
         return `
           <div class="metric-card zone-${zone.key}">
             <div class="metric-name">${metric.shortName}</div>
             <div class="metric-value" style="color: ${zone.color}">${hasData ? z.toFixed(2) : '--'}</div>
             <div class="metric-zone" style="color: ${zone.color}">${hasData ? zone.name.substring(0, 4) : 'N/A'}</div>
+            <div class="metric-raw">raw: ${rawDisplay}</div>
             <div class="metric-sparkline"><canvas id="spark-${key}" width="100" height="30"></canvas></div>
           </div>
         `;
       }).join('');
       
-      // Draw sparklines
       Object.keys(METRICS).forEach(drawSparkline);
     }
 
@@ -937,14 +1070,15 @@
       
       ctx.clearRect(0, 0, 200, 120);
       
-      // Arc segments
-      [
+      const segments = [
         { start: Math.PI, end: Math.PI * 1.2, color: '#00d97e' },
         { start: Math.PI * 1.2, end: Math.PI * 1.4, color: '#84cc16' },
         { start: Math.PI * 1.4, end: Math.PI * 1.6, color: '#eab308' },
         { start: Math.PI * 1.6, end: Math.PI * 1.8, color: '#f97316' },
         { start: Math.PI * 1.8, end: Math.PI * 2, color: '#ef4444' }
-      ].forEach(seg => {
+      ];
+      
+      segments.forEach(seg => {
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, seg.start, seg.end);
         ctx.strokeStyle = seg.color;
@@ -953,8 +1087,8 @@
         ctx.stroke();
       });
       
-      // Needle
-      const clamped = Math.max(-3, Math.min(3, value || 0));
+      const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
+      const clamped = Math.max(-3, Math.min(3, safeValue));
       const angle = Math.PI + ((clamped + 3) / 6) * Math.PI;
       
       ctx.beginPath();
@@ -983,11 +1117,11 @@
       if (!data || data.length < 2) {
         ctx.fillStyle = '#5a5c63';
         ctx.font = '9px JetBrains Mono';
-        ctx.fillText('no data', 20, 18);
+        ctx.fillText('no data', 25, 18);
         return;
       }
       
-      const values = data.slice(-30).map(d => d.value).filter(v => typeof v === 'number');
+      const values = data.slice(-30).map(d => d.value).filter(v => typeof v === 'number' && !isNaN(v));
       if (values.length < 2) return;
       
       const min = Math.min(...values);
@@ -1011,54 +1145,72 @@
 
     function renderCharts() {
       const priceCtx = document.getElementById('priceChart')?.getContext('2d');
+      
       if (priceCtx && state.prices.length > 0) {
-        const labels = state.prices.map(p => {
-          const d = new Date(p.date);
-          return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-        });
-        const values = state.prices.map(p => p.value).filter(v => typeof v === 'number');
+        const validPrices = state.prices.filter(p => 
+          typeof p.value === 'number' && !isNaN(p.value) && p.date
+        );
         
-        const zone = getZone(state.composite);
-        
-        if (priceChart) priceChart.destroy();
-        priceChart = new Chart(priceCtx, {
-          type: 'line',
-          data: {
-            labels: labels.slice(-values.length),
-            datasets: [{
-              data: values,
-              borderColor: zone.color,
-              backgroundColor: zone.color + '33',
-              fill: true,
-              tension: 0.1,
-              pointRadius: 0,
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { grid: { color: '#252830' }, ticks: { color: '#5a5c63', maxTicksLimit: 12, font: { size: 10 } } },
-              y: { 
-                type: 'logarithmic',
-                grid: { color: '#252830' }, 
-                ticks: { color: '#5a5c63', font: { size: 10 }, callback: v => '$' + v.toLocaleString() }
+        if (validPrices.length > 0) {
+          const labels = validPrices.map(p => {
+            const d = new Date(p.date);
+            return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          });
+          const values = validPrices.map(p => p.value);
+          
+          const zone = getZone(state.composite);
+          
+          if (priceChart) priceChart.destroy();
+          priceChart = new Chart(priceCtx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                data: values,
+                borderColor: zone.color,
+                backgroundColor: zone.color + '33',
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0,
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { 
+                  grid: { color: '#252830' }, 
+                  ticks: { color: '#5a5c63', maxTicksLimit: 12, font: { size: 10 } } 
+                },
+                y: { 
+                  type: 'logarithmic',
+                  grid: { color: '#252830' }, 
+                  ticks: { 
+                    color: '#5a5c63', 
+                    font: { size: 10 }, 
+                    callback: v => '$' + v.toLocaleString() 
+                  }
+                }
               }
             }
-          }
-        });
+          });
+        }
       }
       
-      // Oscillator - synthetic based on current composite
       const oscCtx = document.getElementById('oscillatorChart')?.getContext('2d');
       if (oscCtx) {
         const days = 90;
         const baseZ = state.composite || 0;
-        const synthData = Array(days).fill(0).map((_, i) => {
-          return baseZ + (Math.random() - 0.5) * 0.3 + (i / days - 0.5) * 0.5;
-        });
+        
+        const synthData = [];
+        for (let i = 0; i < days; i++) {
+          const progress = i / days;
+          const noise = (Math.random() - 0.5) * 0.3;
+          const trend = baseZ + (progress - 0.5) * 0.4;
+          synthData.push(trend + noise);
+        }
         
         const labels = Array(days).fill('').map((_, i) => {
           const d = new Date();
@@ -1095,16 +1247,17 @@
     }
 
     // ============================================
-    // Init
+    // Initialize
     // ============================================
     async function init() {
       renderApiStatus();
+      
       try {
         await fetchAllData();
       } catch (error) {
         console.error('Init error:', error);
         document.getElementById('errorBanner').classList.add('visible');
-        document.getElementById('errorText').textContent = error.message;
+        document.getElementById('errorText').textContent = `Erro: ${error.message}`;
         document.getElementById('loadingOverlay').classList.add('hidden');
       }
       
