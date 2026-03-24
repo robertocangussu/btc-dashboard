@@ -1,276 +1,317 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BTC Valuation Index · Ruga Research</title>
+<title>OnchainBR · Bitcoin Valuation Index</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+/* ── TOKENS ── */
 :root {
-  --bg0:#07090b; --bg1:#0d1117; --bg2:#111820; --bg3:#171f28; --bg4:#1c2735;
-  --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.11);
-  --t0:#eef2f6; --t1:#8fa8bf; --t2:#4d6b85; --t3:#2d4558;
+  --bg0:#060809; --bg1:#0c1117; --bg2:#111920; --bg3:#18222d; --bg4:#1f2d3b;
+  --b1:rgba(255,255,255,.06); --b2:rgba(255,255,255,.11); --b3:rgba(255,255,255,.18);
+  --t0:#edf2f7; --t1:#8fa8c0; --t2:#4d6a85; --t3:#2d4558;
   --orange:#f7931a; --green:#00d97e; --red:#ef4444; --yellow:#fbbf24; --blue:#38bdf8;
   --acc:#22c55e; --und:#84cc16; --fair:#eab308; --ovr:#f97316; --dist:#ef4444;
   --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+  --r6:6px; --r8:8px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{background:var(--bg0);color:var(--t0);font-family:var(--sans);font-size:12px;min-height:100vh;overflow-x:hidden}
+body{background:var(--bg0);color:var(--t0);font-family:var(--sans);font-size:12px;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* subtle dot grid */
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+
+/* ── LAYOUT UTILS ── */
+.z1{position:relative;z-index:1}
+.card{background:var(--bg1);border:1px solid var(--b1);border-radius:var(--r8);padding:16px;position:relative;overflow:hidden}
+.card-accent{position:absolute;top:0;left:0;right:0;height:2px;transition:background .5s}
+.row{display:flex;align-items:center;gap:8px}
+.col{display:flex;flex-direction:column;gap:4px}
+
+/* ── TYPOGRAPHY SCALE ── */
+.mono{font-family:var(--mono)}
+.t0{color:var(--t0)}.t1{color:var(--t1)}.t2{color:var(--t2)}.t3{color:var(--t3)}
+.xs{font-size:9px}.sm{font-size:10px}.md{font-size:12px}.lg{font-size:14px}
+.caps{text-transform:uppercase;letter-spacing:.1em}
+.fw6{font-weight:600}.fw7{font-weight:700}
 
 /* ── HEADER ── */
-.hdr{
+header{
   position:sticky;top:0;z-index:100;
-  background:rgba(7,9,11,0.96);backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);
-  padding:8px 20px;
+  background:rgba(6,8,9,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--b1);
+  padding:9px 22px;
   display:flex;align-items:center;justify-content:space-between;
 }
-.hdr-brand{display:flex;flex-direction:column;gap:1px}
-.hdr-logo{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--orange);letter-spacing:.18em;text-transform:uppercase}
-.hdr-title{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--t0);letter-spacing:.04em}
-.hdr-sub{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.08em}
-.hdr-right{display:flex;align-items:center;gap:16px}
-.hdr-time{font-family:var(--mono);font-size:9px;color:var(--t2);text-align:right;line-height:1.7}
-.hdr-time b{color:var(--orange);font-weight:600}
-.pill{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--t2)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--t3)}
-.dot.live{background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 2s infinite}
-.dot.err{background:var(--red)}
-.dot.load{background:var(--yellow);animation:pulse 1s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.btn{background:transparent;border:1px solid var(--border2);color:var(--t1);padding:5px 12px;border-radius:4px;font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;transition:all .2s}
-.btn:hover{border-color:var(--orange);color:var(--orange)}
-.btn.spin{animation:pulse 1s infinite}
+.brand-mark{width:30px;height:30px;background:var(--orange);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:#000;flex-shrink:0;box-shadow:0 0 16px rgba(247,147,26,.3)}
+.brand-text .name{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--t0);letter-spacing:.04em}
+.brand-text .sub{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.08em;margin-top:1px}
+.hdr-center{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.06em;text-align:center;line-height:1.7}
+.hdr-center b{color:var(--orange)}
+.status-pill{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--t2)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0}
+.dot.live{background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 2s ease-in-out infinite}
+.dot.err{background:var(--red);box-shadow:0 0 5px var(--red)}
+.dot.load{background:var(--yellow);animation:pulse-d 1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes pulse-d{0%,100%{opacity:1}50%{opacity:.25}}
+.btn-refresh{background:transparent;border:1px solid var(--b2);color:var(--t1);padding:6px 13px;border-radius:5px;font-family:var(--mono);font-size:9px;font-weight:600;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;transition:border-color .2s,color .2s,box-shadow .2s;white-space:nowrap}
+.btn-refresh:hover{border-color:var(--orange);color:var(--orange);box-shadow:0 0 12px rgba(247,147,26,.15)}
+.btn-refresh:disabled{opacity:.4;cursor:default}
+.btn-refresh.loading{animation:pulse-d 1s infinite}
 
-/* ── LAYOUT ── */
-.wrap{max-width:1440px;margin:0 auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+/* ── MAIN WRAP ── */
+main{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
 
-/* ── HERO ── */
-.hero{display:grid;grid-template-columns:220px 1fr 200px;gap:12px;align-items:start}
+/* ── ALERT ── */
+.alert{background:rgba(234,179,8,.07);border:1px solid rgba(234,179,8,.22);color:var(--yellow);font-family:var(--mono);font-size:9px;padding:9px 14px;border-radius:6px;display:none;line-height:1.7}
+.alert.show{display:block}
+
+/* ── HERO ROW ── */
+.hero{display:grid;grid-template-columns:220px 1fr 210px;gap:14px;align-items:start}
 
 /* Z-SCORE CARD */
-.card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:16px;position:relative;overflow:hidden}
-.card-top-bar{position:absolute;top:0;left:0;right:0;height:2px;transition:background .5s}
-
-.zs-lbl{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px}
-.zs-val{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1;letter-spacing:-.03em;margin-bottom:4px;transition:color .5s}
-.zs-zone{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.zs-lbl{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.15em;margin-bottom:6px}
+.zs-num{font-family:var(--mono);font-size:58px;font-weight:700;line-height:1;letter-spacing:-.03em;margin-bottom:4px;transition:color .5s}
+.zs-zone{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
 .zs-win{font-family:var(--mono);font-size:9px;color:var(--t3);margin-bottom:14px}
-.meta{display:flex;flex-direction:column;gap:5px;padding-top:12px;border-top:1px solid var(--border)}
+.meta-tbl{display:flex;flex-direction:column;gap:5px;padding-top:11px;border-top:1px solid var(--b1)}
 .meta-row{display:flex;justify-content:space-between;align-items:center}
-.ml{font-family:var(--mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em}
-.mv{font-family:var(--mono);font-size:10px;color:var(--t1)}
-.mv.g{color:var(--green)}.mv.r{color:var(--red)}.mv.y{color:var(--yellow)}.mv.o{color:var(--orange)}
+.meta-lbl{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em}
+.meta-val{font-family:var(--mono);font-size:10px;color:var(--t1)}
+.meta-val.g{color:var(--green)}.meta-val.r{color:var(--red)}.meta-val.y{color:var(--yellow)}.meta-val.o{color:var(--orange)}
 
-/* GAUGE */
-.gauge-card{display:flex;flex-direction:column;align-items:center;padding:20px 16px 12px;gap:10px}
-.gauge-wrap{position:relative;width:100%;max-width:380px}
-.gauge-wrap canvas{width:100%}
-.gcl{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap}
-.gcl-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
-.conv-bar-row{width:100%;max-width:380px}
-.conv-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px}
-.conv-track{width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,#22c55e 0%,#84cc16 25%,#eab308 50%,#f97316 75%,#ef4444 100%);position:relative;margin-bottom:4px}
-.conv-needle{position:absolute;top:-4px;width:3px;height:14px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 6px rgba(255,255,255,.5);transition:left .8s cubic-bezier(.4,0,.2,1)}
-.conv-zones{display:flex;justify-content:space-between}
-.czl{font-family:var(--mono);font-size:8px;color:var(--t3);display:flex;align-items:center;gap:3px}
-.czl-dot{width:6px;height:6px;border-radius:50%}
+/* GAUGE CARD */
+.gauge-card{display:flex;flex-direction:column;align-items:center;padding:18px 16px 14px;gap:10px}
+.gauge-wrap{position:relative;width:100%;max-width:360px}
+.gauge-canvas{width:100%}
+.gauge-foot{font-family:var(--mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-top:2px}
+.conv-row{width:100%;max-width:360px}
+.conv-title{font-family:var(--mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:5px}
+.conv-track{width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,#22c55e 0%,#84cc16 25%,#eab308 50%,#f97316 75%,#ef4444 100%);position:relative;margin-bottom:5px}
+.conv-pin{position:absolute;top:-4px;width:3px;height:14px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 6px rgba(255,255,255,.55);transition:left .8s cubic-bezier(.4,0,.2,1)}
+.conv-lbls{display:flex;justify-content:space-between}
+.conv-lbl-item{display:flex;align-items:center;gap:3px;font-family:var(--mono);font-size:8px;color:var(--t2)}
+.mini-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
 /* PRICE CARD */
 .price-card{display:flex;flex-direction:column;gap:8px}
+.pc-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.08em}
+.pc-price{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--orange);letter-spacing:-.02em;text-shadow:0 0 24px rgba(247,147,26,.2);margin-bottom:1px}
 .pc-date{font-family:var(--mono);font-size:9px;color:var(--t3)}
-.pc-price{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--orange);text-shadow:0 0 25px rgba(247,147,26,.2);letter-spacing:-.02em}
 .pc-chg{font-family:var(--mono);font-size:10px;font-weight:600}
 .pc-chg.neg{color:var(--red)}.pc-chg.pos{color:var(--green)}
-.sa-box{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:4px}
-.sa-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
-.sa-val{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}
-.sa-desc{font-family:var(--mono);font-size:9px;color:var(--t2)}
+.sa-box{background:var(--bg3);border:1px solid var(--b1);border-radius:6px;padding:11px;margin-top:2px}
+.sa-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.sa-num{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;margin-bottom:3px}
+.sa-desc{font-family:var(--mono);font-size:8px;color:var(--t2)}
+.zones-legend{display:flex;flex-direction:column;gap:3px;padding-top:8px;border-top:1px solid var(--b1)}
+.zone-leg-row{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;color:var(--t2)}
+.zone-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
-/* ── STRIP ── */
-.strip{display:grid;grid-template-columns:repeat(6,1fr);background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;gap:1px}
+/* ── INFO STRIP ── */
+.strip{display:grid;grid-template-columns:repeat(6,1fr);background:var(--b1);border:1px solid var(--b1);border-radius:var(--r8);overflow:hidden;gap:1px}
 .si{background:var(--bg1);padding:10px 14px}
 .si-lbl{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
 .si-val{font-family:var(--mono);font-size:15px;font-weight:600;margin-bottom:2px}
 .si-sub{font-family:var(--mono);font-size:8px;color:var(--t2)}
 
-/* ── METRICS ── */
-.metrics-row{display:grid;grid-template-columns:1fr 260px;gap:12px}
-.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.mc{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px;position:relative;overflow:hidden;cursor:default;transition:border-color .2s}
-.mc:hover{border-color:var(--border2)}
-.mc-bar{position:absolute;bottom:0;left:0;height:2px;transition:width .8s ease,background .5s}
+/* ── METRICS SECTION ── */
+.metrics-section{display:grid;grid-template-columns:1fr 256px;gap:14px}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+
+/* METRIC CARD */
+.mc{background:var(--bg1);border:1px solid var(--b1);border-radius:var(--r8);padding:12px;position:relative;overflow:hidden;transition:border-color .2s}
+.mc:hover{border-color:var(--b2)}
+.mc-bottom-bar{position:absolute;bottom:0;left:0;height:2px;border-radius:0 2px 0 0;transition:width .8s ease,background .5s}
 .mc-name{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
 .mc-z{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;margin-bottom:3px;transition:color .4s}
-.mc-sig{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.mc-sig{font-family:var(--mono);font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
 .mc-raw{font-family:var(--mono);font-size:9px;color:var(--t2);margin-bottom:6px}
-.mc-spark{height:28px;margin-top:4px}
+.mc-spark{height:30px;margin-top:2px}
 .mc-spark canvas{width:100%!important;height:100%!important}
 
 /* CONVICTION SIDEBAR */
-.conv-side{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.cs-title{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase}
-.cz-rows{display:flex;flex-direction:column;gap:6px}
-.cz{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:5px;border:1px solid transparent;transition:all .3s}
-.cz.active{background:rgba(255,255,255,.04)}
-.cz-l{display:flex;align-items:center;gap:7px}
-.cz-dot{width:7px;height:7px;border-radius:50%}
-.cz-name{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.06em}
+.conv-side{background:var(--bg1);border:1px solid var(--b1);border-radius:var(--r8);padding:14px;display:flex;flex-direction:column;gap:10px}
+.cs-title{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.14em}
+.cz-list{display:flex;flex-direction:column;gap:5px}
+.cz-row{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:5px;border:1px solid transparent;transition:background .3s,border-color .3s}
+.cz-row.active{background:rgba(255,255,255,.04)}
+.cz-left{display:flex;align-items:center;gap:7px}
+.cz-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cz-name{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.05em}
 .cz-range{font-family:var(--mono);font-size:8px;opacity:.6}
-.ep-list{display:flex;flex-direction:column;gap:3px;padding-top:8px;border-top:1px solid var(--border)}
-.ep-title{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
-.ep{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px}
+.ep-section{padding-top:8px;border-top:1px solid var(--b1)}
+.ep-title{font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.ep-row{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;margin-bottom:3px}
+.ep-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 
-/* ── CHARTS ── */
-.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.chart-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:14px}
-.ct-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.ct-title{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t2);letter-spacing:.1em;text-transform:uppercase}
-.ct-badge{font-family:var(--mono);font-size:8px;color:var(--orange);border:1px solid rgba(247,147,26,.3);padding:2px 7px;border-radius:3px;letter-spacing:.07em}
-.chart-h{height:160px;position:relative}
-
-/* ── ALERT ── */
-.alert{background:rgba(234,179,8,.07);border:1px solid rgba(234,179,8,.22);color:var(--yellow);font-family:var(--mono);font-size:9px;padding:9px 14px;border-radius:6px;display:none;line-height:1.6}
-.alert.show{display:block}
+/* ── CHART SECTIONS ── */
+.charts-col{display:flex;flex-direction:column;gap:14px}
+.chart-card{background:var(--bg1);border:1px solid var(--b1);border-radius:var(--r8);padding:14px}
+.chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.chart-title{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em}
+.chart-badge{font-family:var(--mono);font-size:8px;color:var(--orange);border:1px solid rgba(247,147,26,.3);padding:2px 7px;border-radius:3px;letter-spacing:.07em}
+.chart-h180{height:180px;position:relative}
+.chart-h160{height:160px;position:relative}
 
 /* ── FOOTER ── */
-.foot{font-family:var(--mono);font-size:8px;color:var(--t3);text-align:center;padding:10px 0;letter-spacing:.06em}
+footer{position:relative;z-index:1;padding:12px 22px;border-top:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center}
+.foot-l,.foot-r{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.06em}
 
-/* FADE */
-.fade{animation:fadeUp .4s ease forwards;opacity:0}
-.d1{animation-delay:.05s}.d2{animation-delay:.12s}.d3{animation-delay:.2s}.d4{animation-delay:.28s}.d5{animation-delay:.36s}
-@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* ── ANIMATIONS ── */
+.fade-in{animation:fadeUp .45s ease forwards;opacity:0}
+.d0{animation-delay:.04s}.d1{animation-delay:.10s}.d2{animation-delay:.17s}.d3{animation-delay:.24s}.d4{animation-delay:.31s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 
-@media(max-width:1100px){.mgrid{grid-template-columns:repeat(2,1fr)}.strip{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:900px){.hero,.metrics-row,.charts-row{grid-template-columns:1fr}}
+/* ── RESPONSIVE ── */
+@media(max-width:1200px){.metrics-grid{grid-template-columns:repeat(2,1fr)}.strip{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:960px){.hero,.metrics-section{grid-template-columns:1fr}}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.strip{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 
-<header class="hdr">
-  <div class="hdr-brand">
-    <div class="hdr-logo">▲ @RugaResearch · On-Chain Research</div>
-    <div class="hdr-title">BTC VALUATION INDEX</div>
-    <div class="hdr-sub">Composite Z-Score · Rolling 365d · 8 Metrics · BGeometrics API</div>
+<!-- ══════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="row" style="gap:10px">
+    <div class="brand-mark">₿</div>
+    <div class="brand-text">
+      <div class="name">OnchainBR</div>
+      <div class="sub">Bitcoin Valuation Index · Composite Z-Score · 8 Metrics</div>
+    </div>
   </div>
-  <div class="hdr-right">
-    <div class="pill"><div class="dot load" id="sDot"></div><span id="sTxt">Carregando...</span></div>
-    <div class="hdr-time"><b id="hDate">—</b><br><span id="hLast">LAST DATA: —</span></div>
-    <button class="btn" id="btnRef" onclick="init()">↻ ATUALIZAR</button>
+  <div class="hdr-center">
+    <span id="hdrDate"><b>—</b></span><br>
+    <span id="hdrLastData">LAST DATA: —</span>
+  </div>
+  <div class="row" style="gap:14px">
+    <div class="status-pill">
+      <div class="dot load" id="statusDot"></div>
+      <span id="statusTxt">Loading...</span>
+    </div>
+    <button class="btn-refresh" id="btnRefresh" onclick="bootstrap()">↻ REFRESH</button>
   </div>
 </header>
 
-<div class="wrap">
-  <div id="alertBox" class="alert"></div>
+<!-- ══════════════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════════════ -->
+<main>
+  <div class="alert" id="alertBox"></div>
 
   <!-- HERO -->
-  <div class="hero fade d1">
+  <div class="hero fade-in d0">
 
-    <!-- Z-SCORE -->
+    <!-- Z-Score Card -->
     <div class="card" id="zsCard">
-      <div class="card-top-bar" id="zsBar"></div>
+      <div class="card-accent" id="zsAccent"></div>
       <div class="zs-lbl">Z-Score Composite</div>
-      <div class="zs-val" id="zsVal">—</div>
-      <div class="zs-zone" id="zsZone">CARREGANDO</div>
+      <div class="zs-num" id="zsNum">—</div>
+      <div class="zs-zone" id="zsZone">LOADING</div>
       <div class="zs-win">rolling 365d window</div>
-      <div class="meta">
-        <div class="meta-row"><span class="ml">Z Composite</span><span class="mv" id="mZcomp">—</span></div>
-        <div class="meta-row"><span class="ml">Signal Zone</span><span class="mv o" id="mZone">—</span></div>
-        <div class="meta-row"><span class="ml">Z Δ Week</span><span class="mv" id="mZweek">—</span></div>
-        <div class="meta-row"><span class="ml">Price Δ Week</span><span class="mv" id="mPweek">—</span></div>
-        <div class="meta-row"><span class="ml">Weakest Metric</span><span class="mv r" id="mWeak">—</span></div>
-        <div class="meta-row"><span class="ml">Data Range</span><span class="mv">53 weeks</span></div>
-        <div class="meta-row"><span class="ml">Equal-weight</span><span class="mv">8 metrics</span></div>
+      <div class="meta-tbl">
+        <div class="meta-row"><span class="meta-lbl">Z Composite</span><span class="meta-val" id="mComp">—</span></div>
+        <div class="meta-row"><span class="meta-lbl">Signal Zone</span><span class="meta-val o" id="mZone">—</span></div>
+        <div class="meta-row"><span class="meta-lbl">Z Δ Week</span><span class="meta-val" id="mZweek">—</span></div>
+        <div class="meta-row"><span class="meta-lbl">Price Δ Week</span><span class="meta-val" id="mPweek">—</span></div>
+        <div class="meta-row"><span class="meta-lbl">Weakest Metric</span><span class="meta-val r" id="mWeak">—</span></div>
+        <div class="meta-row"><span class="meta-lbl">Data Range</span><span class="meta-val">365 days</span></div>
+        <div class="meta-row"><span class="meta-lbl">Equal-weight</span><span class="meta-val">8 metrics</span></div>
       </div>
     </div>
 
-    <!-- GAUGE -->
+    <!-- Gauge Card -->
     <div class="card gauge-card">
       <div class="gauge-wrap">
-        <canvas id="gCanvas" width="380" height="220"></canvas>
-        <div class="gcl"><div class="gcl-lbl">Conviction Signal</div></div>
+        <canvas id="gaugeCanvas" class="gauge-canvas" width="360" height="210"></canvas>
       </div>
-      <div class="conv-bar-row">
-        <div class="conv-lbl">Conviction Scale</div>
-        <div class="conv-track"><div class="conv-needle" id="cNeedle" style="left:30%"></div></div>
-        <div class="conv-zones">
-          <div class="czl"><div class="czl-dot" style="background:#22c55e"></div>Acumular</div>
-          <div class="czl"><div class="czl-dot" style="background:#84cc16"></div>Subvalorizado</div>
-          <div class="czl"><div class="czl-dot" style="background:#eab308"></div>Justo</div>
-          <div class="czl"><div class="czl-dot" style="background:#f97316"></div>Sobrevalorizado</div>
-          <div class="czl"><div class="czl-dot" style="background:#ef4444"></div>Distribuir</div>
+      <div class="gauge-foot">Conviction Signal</div>
+      <div class="conv-row">
+        <div class="conv-title">Conviction Scale</div>
+        <div class="conv-track">
+          <div class="conv-pin" id="convPin" style="left:30%"></div>
+        </div>
+        <div class="conv-lbls">
+          <div class="conv-lbl-item"><div class="mini-dot" style="background:var(--acc)"></div>Accumulate</div>
+          <div class="conv-lbl-item"><div class="mini-dot" style="background:var(--und)"></div>Undervalued</div>
+          <div class="conv-lbl-item"><div class="mini-dot" style="background:var(--fair)"></div>Fair</div>
+          <div class="conv-lbl-item"><div class="mini-dot" style="background:var(--ovr)"></div>Overvalued</div>
+          <div class="conv-lbl-item"><div class="mini-dot" style="background:var(--dist)"></div>Distribute</div>
         </div>
       </div>
     </div>
 
-    <!-- PRICE -->
+    <!-- Price Card -->
     <div class="card price-card">
-      <div class="pc-date" id="pcDate">BTC / USD</div>
+      <div class="pc-lbl">BTC / USD</div>
       <div class="pc-price" id="pcPrice">—</div>
+      <div class="pc-date" id="pcDate">—</div>
       <div class="pc-chg" id="pcChg">—</div>
-      <div style="height:1px;background:var(--border);margin:10px 0"></div>
       <div class="sa-box">
         <div class="sa-lbl">Signal Alignment</div>
-        <div class="sa-val" id="saVal" style="color:var(--green)">—</div>
+        <div class="sa-num" id="saNum" style="color:var(--green)">—</div>
         <div class="sa-desc" id="saDesc">— accumulate · — undervalued</div>
       </div>
-      <div style="margin-top:8px;font-family:var(--mono);font-size:8px;color:var(--t3);line-height:1.8">
-        <span style="color:var(--acc)">● ACCUMULATE</span> z ≤ -1.5<br>
-        <span style="color:var(--und)">● UNDERVALUED</span> -1.5 → -0.5<br>
-        <span style="color:var(--fair)">● FAIR VALUE</span> -0.5 → +0.5<br>
-        <span style="color:var(--ovr)">● OVERVALUED</span> +0.5 → +1.5<br>
-        <span style="color:var(--dist)">● DISTRIBUTE</span> z ≥ +1.5
+      <div class="zones-legend">
+        <div class="zone-leg-row"><div class="zone-leg-dot" style="background:var(--acc)"></div>ACCUMULATE  z ≤ −1.5</div>
+        <div class="zone-leg-row"><div class="zone-leg-dot" style="background:var(--und)"></div>UNDERVALUED  −1.5 → −0.5</div>
+        <div class="zone-leg-row"><div class="zone-leg-dot" style="background:var(--fair)"></div>FAIR VALUE  −0.5 → +0.5</div>
+        <div class="zone-leg-row"><div class="zone-leg-dot" style="background:var(--ovr)"></div>OVERVALUED  +0.5 → +1.5</div>
+        <div class="zone-leg-row"><div class="zone-leg-dot" style="background:var(--dist)"></div>DISTRIBUTE  z ≥ +1.5</div>
       </div>
     </div>
   </div>
 
-  <!-- STRIP -->
-  <div class="strip fade d2">
+  <!-- INFO STRIP -->
+  <div class="strip fade-in d1">
     <div class="si">
       <div class="si-lbl">Z Composite</div>
-      <div class="si-val" id="sZ">—</div>
+      <div class="si-val" id="stZ">—</div>
       <div class="si-sub">equal-weight · 8 metrics</div>
     </div>
     <div class="si">
       <div class="si-lbl">Signal Zone</div>
-      <div class="si-val" id="sZone">—</div>
-      <div class="si-sub" id="sThresh">threshold —</div>
+      <div class="si-val" id="stZone">—</div>
+      <div class="si-sub" id="stThresh">threshold —</div>
     </div>
     <div class="si">
       <div class="si-lbl">Z Δ Week</div>
-      <div class="si-val" id="sZweek">—</div>
-      <div class="si-sub" id="sZweekSub">was — 1w ago</div>
+      <div class="si-val" id="stZweek">—</div>
+      <div class="si-sub" id="stZweekSub">was — 1w ago</div>
     </div>
     <div class="si">
       <div class="si-lbl">Price Δ Week</div>
-      <div class="si-val" id="sPweek">—</div>
-      <div class="si-sub" id="sPweekSub">— → —</div>
+      <div class="si-val" id="stPweek">—</div>
+      <div class="si-sub" id="stPweekSub">— → —</div>
     </div>
     <div class="si">
       <div class="si-lbl">Weakest Metric</div>
-      <div class="si-val" id="sWeak" style="color:var(--red)">—</div>
-      <div class="si-sub" id="sWeakZ">z = —</div>
+      <div class="si-val t1" id="stWeak">—</div>
+      <div class="si-sub" id="stWeakZ">z = —</div>
     </div>
     <div class="si">
       <div class="si-lbl">Data Range</div>
       <div class="si-val">53 weeks</div>
-      <div class="si-sub" id="sRange">Mar 2025 → Mar 2026</div>
+      <div class="si-sub" id="stRange">Mar 2025 → Mar 2026</div>
     </div>
   </div>
 
-  <!-- METRICS + SIDEBAR -->
-  <div class="metrics-row fade d3">
+  <!-- METRICS + CONVICTION -->
+  <div class="metrics-section fade-in d2">
     <div>
-      <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px">Metric Breakdown</div>
-      <div class="mgrid" id="mgrid"></div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px">Metric Breakdown</div>
+      <div class="metrics-grid" id="metricsGrid"></div>
     </div>
     <div class="conv-side">
       <div class="cs-title">Conviction Scale</div>
-      <div class="cz-rows" id="czRows"></div>
-      <div class="ep-list">
+      <div class="cz-list" id="czList"></div>
+      <div class="ep-section">
         <div class="ep-title">API Endpoints</div>
         <div id="epList"></div>
       </div>
@@ -278,531 +319,916 @@ body{background:var(--bg0);color:var(--t0);font-family:var(--sans);font-size:12p
   </div>
 
   <!-- CHARTS -->
-  <div class="charts-row fade d4">
+  <div class="charts-col fade-in d3">
+
+    <!-- BTC/USD Price Chart colored by zone -->
     <div class="chart-card">
-      <div class="ct-row">
-        <span class="ct-title">Z-Composite Oscillator</span>
-        <span class="ct-badge">ROLLING 365D · WEEKLY</span>
+      <div class="chart-hdr">
+        <span class="chart-title">BTC/USD — Daily Close · Colored by Z-Composite Zone</span>
+        <span class="chart-badge">365 DAYS · LOG SCALE</span>
       </div>
-      <div class="chart-h"><canvas id="oscChart"></canvas></div>
+      <div class="chart-h180"><canvas id="priceChart"></canvas></div>
     </div>
+
+    <!-- Z-Composite Oscillator -->
     <div class="chart-card">
-      <div class="ct-row">
-        <span class="ct-title">Individual Z-Scores — All Metrics Overlay</span>
-        <span class="ct-badge">8 METRICS</span>
+      <div class="chart-hdr">
+        <span class="chart-title">Z-Composite Oscillator</span>
+        <span class="chart-badge">ROLLING 365D · WEEKLY</span>
       </div>
-      <div class="chart-h"><canvas id="ovlChart"></canvas></div>
+      <div class="chart-h160"><canvas id="oscChart"></canvas></div>
     </div>
+
+    <!-- Individual Z-Scores Overlay -->
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <span class="chart-title">Individual Z-Scores — All Metrics Overlay</span>
+        <span class="chart-badge">8 METRICS</span>
+      </div>
+      <div class="chart-h160"><canvas id="overlayChart"></canvas></div>
+    </div>
+
   </div>
+</main>
 
-</div>
-
-<div class="foot">
-  Source: bitcoin-data.com/v1/ · BGeometrics Free API · No auth required · Auto-refresh 5min · @RugaResearch
-</div>
+<footer>
+  <div class="foot-l">Source: bitcoin-data.com/v1/ · BGeometrics API · Rolling 365d z-score · Auto-refresh 5min</div>
+  <div class="foot-r" id="footDate">OnchainBR · —</div>
+</footer>
 
 <script>
-// ═══════════════════════════════════════════════════════════
-//  DATA & CONFIG
-// ═══════════════════════════════════════════════════════════
-const BASE_DIRECT = 'https://bitcoin-data.com/v1';
-const BASE_PROXY  = 'https://corsproxy.io/?url=https://bitcoin-data.com/v1';
-let   BASE        = BASE_DIRECT;
+'use strict';
+// ══════════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════════
+const API_BASE = 'https://bitcoin-data.com/v1';
+// Replace with your API key from BGeometrics when received:
+const API_KEY  = '';   // e.g. 'Bearer YOUR_TOKEN_HERE'
 
-const MDEF = [
-  { key:'mvrv',   name:'MVRV Ratio',        ep:'/mvrv-zscore',     isZ:true,  mean:0,     std:1,     color:'#f87171', short:'MVRV'    },
-  { key:'nupl',   name:'NUPL',              ep:'/nupl',            isZ:false, mean:.35,   std:.28,   color:'#4ade80', short:'NUPL'    },
-  { key:'sopr',   name:'SOPR',              ep:'/sopr',            isZ:false, mean:1.005, std:.015,  color:'#fb923c', short:'SOPR'    },
-  { key:'mayer',  name:'Mayer Multiple',    ep:'/mayer-multiple',  isZ:false, mean:1.10,  std:.40,   color:'#a78bfa', short:'Mayer'   },
-  { key:'ssr',    name:'Stablecoin Ratio',  ep:'/puell-multiple',  isZ:false, mean:1.0,   std:.7,    color:'#fbbf24', short:'SSR'     },
-  { key:'rsi',    name:'RSI (1W)',           ep:null,               isZ:false, mean:50,    std:15,    color:'#38bdf8', short:'RSI 1W', synth:true },
-  { key:'profit', name:'Supply in Profit %',ep:'/supply-profit-loss',isZ:false,mean:72,   std:18,    color:'#34d399', short:'Profit%' },
-  { key:'fg',     name:'Fear & Greed',       ep:'/fear-greed',      isZ:false, mean:50,    std:22,    color:'#e879f9', short:'F&G'     },
+const METRIC_DEFS = [
+  { key:'mvrv',   name:'MVRV Ratio',         ep:'/mvrv-zscore',       isPreZ:true,  mean:0,     std:1,     color:'#f87171', short:'MVRV'    },
+  { key:'nupl',   name:'NUPL',               ep:'/nupl',              isPreZ:false, mean:.35,   std:.28,   color:'#4ade80', short:'NUPL'    },
+  { key:'sopr',   name:'SOPR',               ep:'/sopr',              isPreZ:false, mean:1.005, std:.015,  color:'#fb923c', short:'SOPR'    },
+  { key:'mayer',  name:'Mayer Multiple',     ep:'/mayer-multiple',    isPreZ:false, mean:1.10,  std:.40,   color:'#a78bfa', short:'Mayer'   },
+  { key:'ssr',    name:'Stablecoin Ratio',   ep:'/puell-multiple',    isPreZ:false, mean:1.0,   std:.7,    color:'#fbbf24', short:'SSR'     },
+  { key:'rsi',    name:'RSI (1W)',            ep:null,                 isPreZ:false, mean:50,    std:15,    color:'#38bdf8', short:'RSI 1W', synth:true },
+  { key:'profit', name:'Supply in Profit %', ep:'/supply-profit-loss',isPreZ:false, mean:72,    std:18,    color:'#34d399', short:'Profit%' },
+  { key:'fg',     name:'Fear & Greed',        ep:'/fear-greed',        isPreZ:false, mean:50,    std:22,    color:'#e879f9', short:'F&G'     },
 ];
 
 const ZONES = [
-  { name:'ACCUMULATE',    range:'z < -1.5',    min:-99, max:-1.5, color:'#22c55e', pct:10 },
-  { name:'UNDERVALUED',   range:'-1.5 → -0.5', min:-1.5,max:-.5,  color:'#84cc16', pct:30 },
-  { name:'FAIR VALUE',    range:'-0.5 → +0.5', min:-.5, max:.5,   color:'#eab308', pct:50 },
-  { name:'OVERVALUED',    range:'+0.5 → +1.5', min:.5,  max:1.5,  color:'#f97316', pct:70 },
-  { name:'DISTRIBUTE',    range:'z > +1.5',    min:1.5, max:99,   color:'#ef4444', pct:90 },
+  { name:'ACCUMULATE',  range:'z < −1.5',    min:-99,  max:-1.5, color:'#22c55e', pct:10 },
+  { name:'UNDERVALUED', range:'−1.5 → −0.5', min:-1.5, max:-.5,  color:'#84cc16', pct:30 },
+  { name:'FAIR VALUE',  range:'−0.5 → +0.5', min:-.5,  max:.5,   color:'#eab308', pct:50 },
+  { name:'OVERVALUED',  range:'+0.5 → +1.5', min:.5,   max:1.5,  color:'#f97316', pct:70 },
+  { name:'DISTRIBUTE',  range:'z > +1.5',    min:1.5,  max:99,   color:'#ef4444', pct:90 },
 ];
 
-let oscC=null, ovlC=null;
+// Chart instances
+let chartPrice=null, chartOsc=null, chartOverlay=null;
 
-// ═══════════════════════════════════════════════════════════
-//  UTILS
-// ═══════════════════════════════════════════════════════════
-const f=(v,d=2)=>v==null||isNaN(v)?'—':Number(v).toFixed(d);
-const fUSD=v=>v==null?'—':'$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const zColor=z=>z==null?'var(--t3)':z<=-1.5?'#22c55e':z<=-.5?'#84cc16':z<=.5?'#eab308':z<=1.5?'#f97316':'#ef4444';
-const zZone=z=>z==null?'N/D':z<=-1.5?'ACCUMULATE':z<=-.5?'UNDERVALUED':z<=.5?'FAIR VALUE':z<=1.5?'OVERVALUED':'DISTRIBUTE';
-const zSig=z=>z==null?['—','#666']:z<=-1.5?['ACC','#22c55e']:z<=-.5?['UND','#84cc16']:z<=.5?['FAIR','#eab308']:z<=1.5?['OVR','#f97316']:['DIST','#ef4444'];
-const zPct=z=>clamp(50+(z??0)/3*50,2,98);
+// ══════════════════════════════════════════════════════════════════
+//  UTILITY FUNCTIONS
+// ══════════════════════════════════════════════════════════════════
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const fN    = (v, d=2) => (v==null||isNaN(v)) ? '—' : Number(v).toFixed(d);
+const fUSD  = v => v==null ? '—' : '$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
+const fPct  = v => v==null ? '—' : (v>=0?'+':'')+fN(v,1)+'%';
+const fZ    = v => v==null ? '—' : (v>=0?'+':'')+fN(v,2);
 
-function setStatus(s,t){
-  document.getElementById('sDot').className='dot '+s;
-  document.getElementById('sTxt').textContent=t;
+function zToColor(z) {
+  if (z==null) return 'var(--t3)';
+  if (z<=-1.5)  return '#22c55e';
+  if (z<=-.5)   return '#84cc16';
+  if (z<=.5)    return '#eab308';
+  if (z<=1.5)   return '#f97316';
+  return '#ef4444';
 }
-function showAlert(m){const el=document.getElementById('alertBox');el.textContent='⚠ '+m;el.classList.add('show')}
-function hideAlert(){document.getElementById('alertBox').classList.remove('show')}
-
-function getLatest(arr){
-  if(!arr||!arr.length)return null;
-  const r=arr[arr.length-1];
-  const k=Object.keys(r).find(k=>!['time','date','t','d'].includes(k));
-  const v=parseFloat(r[k]);return isNaN(v)?null:v;
+function zToZone(z) {
+  if (z==null)  return 'N/A';
+  if (z<=-1.5)  return 'ACCUMULATE';
+  if (z<=-.5)   return 'UNDERVALUED';
+  if (z<=.5)    return 'FAIR VALUE';
+  if (z<=1.5)   return 'OVERVALUED';
+  return 'DISTRIBUTE';
 }
-function getHistArr(arr,n=52){
-  if(!arr||!arr.length)return[];
-  return arr.slice(-n).map(r=>{
-    const k=Object.keys(r).find(k=>!['time','date','t','d'].includes(k));
-    return parseFloat(r[k]);
-  }).filter(v=>!isNaN(v));
+function zToSig(z) {
+  if (z==null)  return ['—',   'var(--t3)'];
+  if (z<=-1.5)  return ['ACC', '#22c55e'];
+  if (z<=-.5)   return ['UND', '#84cc16'];
+  if (z<=.5)    return ['FAIR','#eab308'];
+  if (z<=1.5)   return ['OVR', '#f97316'];
+  return        ['DIST','#ef4444'];
 }
+// z-score → 0–100% position on conviction bar (z=-3 → 2%, z=+3 → 98%)
+const zToPct = z => clamp(50+(clamp(z??0,-3,3)/3)*50, 2, 98);
 
-function calcRSI(prices,p=14){
-  if(prices.length<p+1)return null;
-  let g=0,l=0;
-  for(let i=1;i<=p;i++){const d=prices[i]-prices[i-1];d>0?g+=d:l-=d}
-  let ag=g/p,al=l/p;
-  for(let i=p+1;i<prices.length;i++){
-    const d=prices[i]-prices[i-1];
-    ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;
-  }
-  if(al===0)return 100;
-  return 100-100/(1+ag/al);
+function setStatus(state, text) {
+  const d = document.getElementById('statusDot');
+  d.className = 'dot '+state;
+  document.getElementById('statusTxt').textContent = text;
 }
-
-// ═══════════════════════════════════════════════════════════
-//  FETCH
-// ═══════════════════════════════════════════════════════════
-async function go(path){
-  const r=await fetch(BASE+path,{headers:{'Accept':'application/json'}});
-  if(!r.ok)throw new Error(r.status);
-  return r.json();
+function showAlert(msg) {
+  const el = document.getElementById('alertBox');
+  el.textContent = '⚠ '+msg;
+  el.classList.add('show');
+}
+function hideAlert() {
+  document.getElementById('alertBox').classList.remove('show');
 }
 
-async function fetchAll(){
-  const eps={price:'/price',mvrv:'/mvrv-zscore',nupl:'/nupl',sopr:'/sopr',
-             mayer:'/mayer-multiple',puell:'/puell-multiple',
-             profit:'/supply-profit-loss',fg:'/fear-greed',realized:'/realized-price'};
-  // Try direct first
-  try{BASE=BASE_DIRECT;await go('/price')}catch(e){BASE=BASE_PROXY}
-  const keys=Object.keys(eps);
-  const res=await Promise.allSettled(keys.map(k=>go(eps[k])));
-  const raw={};
-  keys.forEach((k,i)=>{raw[k]=res[i].status==='fulfilled'?res[i].value:null});
-  if(Object.values(raw).every(v=>v===null))throw new Error('no data');
+// ══════════════════════════════════════════════════════════════════
+//  API FETCH
+// ══════════════════════════════════════════════════════════════════
+async function apiFetch(path) {
+  const headers = { 'Accept': 'application/json' };
+  if (API_KEY) headers['Authorization'] = API_KEY;
+  const res = await fetch(API_BASE + path, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status} on ${path}`);
+  return res.json();
+}
+
+async function fetchAllRaw() {
+  const endpoints = {
+    price:    '/price',
+    mvrv:     '/mvrv-zscore',
+    nupl:     '/nupl',
+    sopr:     '/sopr',
+    mayer:    '/mayer-multiple',
+    puell:    '/puell-multiple',
+    profit:   '/supply-profit-loss',
+    fg:       '/fear-greed',
+    realized: '/realized-price',
+  };
+  const keys = Object.keys(endpoints);
+  const results = await Promise.allSettled(keys.map(k => apiFetch(endpoints[k])));
+  const raw = {};
+  keys.forEach((k,i) => {
+    raw[k] = results[i].status === 'fulfilled' ? results[i].value : null;
+  });
+  const loaded = Object.values(raw).filter(Boolean).length;
+  if (loaded === 0) throw new Error('All endpoints failed');
   return raw;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  COMPUTE
-// ═══════════════════════════════════════════════════════════
-function computeScores(raw){
-  const s={};
-  s.mvrv  = raw.mvrv   ? getLatest(raw.mvrv)   : null;  // already z
-  const nupl=raw.nupl  ? getLatest(raw.nupl)   : null;
-  s.nupl  = nupl!=null  ? (nupl-.35)/.28        : null;
-  const sopr=raw.sopr  ? getLatest(raw.sopr)   : null;
-  s.sopr  = sopr!=null  ? (sopr-1.005)/.015     : null;
-  const mayer=raw.mayer ? getLatest(raw.mayer)  : null;
-  s.mayer = mayer!=null ? (mayer-1.10)/.40      : null;
-  const puell=raw.puell ? getLatest(raw.puell)  : null;
-  s.ssr   = puell!=null ? (puell-1.0)/.7        : null;
-  if(raw.price&&raw.price.length>20){
-    const px=raw.price.slice(-20).map(r=>{
-      const k=Object.keys(r).find(k=>!['time','date','t','d'].includes(k));
-      return parseFloat(r[k]);
-    }).filter(v=>!isNaN(v));
-    const rsi=calcRSI(px);
-    s.rsi=rsi!=null?(rsi-50)/15:null;
-  }else s.rsi=null;
-  const sup=raw.profit ? getLatest(raw.profit) : null;
-  s.profit= sup!=null  ? (sup-72)/18           : null;
-  const fg=raw.fg      ? getLatest(raw.fg)     : null;
-  s.fg    = fg!=null   ? (fg-50)/22            : null;
-  return s;
+// ══════════════════════════════════════════════════════════════════
+//  DATA EXTRACTION
+// ══════════════════════════════════════════════════════════════════
+
+// Get array of {t (date string), v (number)} from API response
+function toSeries(arr) {
+  if (!arr || !Array.isArray(arr)) return [];
+  return arr.map(row => {
+    const timeKey = Object.keys(row).find(k => ['time','date','t','d'].includes(k)) || Object.keys(row)[0];
+    const valKey  = Object.keys(row).find(k => !['time','date','t','d'].includes(k));
+    const v = parseFloat(row[valKey]);
+    return isNaN(v) ? null : { t: row[timeKey] || '', v };
+  }).filter(Boolean);
 }
 
-function composite(scores){
-  const vals=Object.values(scores).filter(v=>v!=null);
-  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+// Latest value from a series
+const latest = series => series.length ? series[series.length-1].v : null;
+
+// Value N days before end of series
+function valueNBack(series, n) {
+  const idx = series.length - 1 - n;
+  return idx >= 0 ? series[idx].v : null;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  DEMO
-// ═══════════════════════════════════════════════════════════
-function demoRaw(){
-  const mk=v=>[{time:new Date().toISOString(),value:v}];
-  return{price:mk(70505),mvrv:mk(-1.71),nupl:mk(0.251),sopr:mk(0.993),
-         mayer:mk(0.54),puell:mk(0.3),profit:mk(45.7),fg:mk(18.5),realized:mk(46200)};
-}
-function demoScores(){
-  return{mvrv:-1.71,nupl:-1.88,sopr:-0.79,mayer:-1.40,ssr:-1.44,rsi:-0.76,profit:-1.46,fg:-1.43};
-}
+// ══════════════════════════════════════════════════════════════════
+//  Z-SCORE COMPUTATION — ROLLING 365d
+// ══════════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════════════════════
-function render(raw,scores,zc){
-  const zCol=zColor(zc), zone=zZone(zc);
-
-  // Header
-  const now=new Date();
-  document.getElementById('hDate').textContent=now.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' UTC-3';
-  document.getElementById('hLast').textContent='LAST DATA: '+now.toLocaleDateString('pt-BR');
-
-  // Z-Score card
-  document.getElementById('zsVal').textContent=zc!=null?(zc>=0?'+':'')+f(zc):' —';
-  document.getElementById('zsVal').style.color=zCol;
-  document.getElementById('zsZone').textContent=zone;
-  document.getElementById('zsZone').style.color=zCol;
-  document.getElementById('zsBar').style.background=zCol;
-
-  // Find weakest (highest z) metric
-  let wKey=null,wZ=-Infinity;
-  MDEF.forEach(m=>{if(scores[m.key]!=null&&scores[m.key]>wZ){wZ=scores[m.key];wKey=m.short}});
-
-  // Simulate weekly delta (demo: -.153)
-  const zdw=-0.153;
-  document.getElementById('mZcomp').textContent=zc!=null?f(zc,3):'—';
-  document.getElementById('mZone').textContent=zone;
-  document.getElementById('mZone').style.color=zCol;
-  document.getElementById('mZweek').textContent=(zdw>=0?'+':'')+f(zdw,3);
-  document.getElementById('mZweek').style.color=zdw<0?'var(--green)':'var(--red)';
-  document.getElementById('mPweek').textContent='-6.8%';
-  document.getElementById('mPweek').style.color='var(--red)';
-  document.getElementById('mWeak').textContent=wKey||'—';
-
-  // Gauge
-  drawGauge(zc);
-  document.getElementById('cNeedle').style.left=zPct(zc)+'%';
-
-  // Price
-  const price=raw.price?getLatest(raw.price):null;
-  const realized=raw.realized?getLatest(raw.realized):null;
-  document.getElementById('pcDate').textContent=now.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
-  document.getElementById('pcPrice').textContent=fUSD(price);
-  document.getElementById('pcChg').textContent='▼ -0.8% (1w)';
-  document.getElementById('pcChg').className='pc-chg neg';
-
-  const accCount=Object.values(scores).filter(z=>z!=null&&z<-1.5).length;
-  const undCount=Object.values(scores).filter(z=>z!=null&&z>=-1.5&&z<-.5).length;
-  document.getElementById('saVal').textContent=(accCount+undCount)+'↓';
-  document.getElementById('saVal').style.color=zCol;
-  document.getElementById('saDesc').textContent=accCount+' accumulate · '+undCount+' undervalued';
-
-  // Strip
-  document.getElementById('sZ').textContent=zc!=null?f(zc,3):'—';
-  document.getElementById('sZ').style.color=zCol;
-  document.getElementById('sZone').textContent=zone;
-  document.getElementById('sZone').style.color=zCol;
-  const thresh=zc<=-1.5?'< -1.5':zc<=-.5?'-1.5 → -0.5':zc<=.5?'-0.5 → +0.5':zc<=1.5?'+0.5 → +1.5':'> +1.5';
-  document.getElementById('sThresh').textContent='threshold: '+thresh;
-  document.getElementById('sZweek').textContent=(zdw>=0?'+':'')+f(zdw,3);
-  document.getElementById('sZweek').style.color=zdw<0?'var(--green)':'var(--red)';
-  document.getElementById('sZweekSub').textContent='was '+f(zc!=null?zc-zdw:null,3)+' 1w ago';
-  document.getElementById('sPweek').textContent='-6.8%';
-  document.getElementById('sPweek').style.color='var(--red)';
-  document.getElementById('sPweekSub').textContent='$72,822 → $67,844';
-  document.getElementById('sWeak').textContent=wKey||'—';
-  document.getElementById('sWeakZ').textContent='z = '+f(wZ,2);
-
-  // Metrics grid
-  renderMetrics(scores,raw);
-
-  // Conviction sidebar
-  renderSidebar(zc);
-
-  // API endpoints status
-  renderEP(raw);
-
-  // Charts
-  renderOsc(scores,zc);
-  renderOverlay(scores);
+// Compute rolling z-score series for a metric series
+// For each point i, use the window [i-364..i] (365 points)
+// If window not full, fall back to a fixed mean/std
+function rollingZscore(series, fixedMean, fixedStd) {
+  const WINDOW = 365;
+  const values = series.map(s => s.v);
+  const zs = [];
+  for (let i = 0; i < values.length; i++) {
+    if (i < WINDOW - 1) {
+      // Not enough history → use fixed params
+      const z = (values[i] - fixedMean) / fixedStd;
+      zs.push(isFinite(z) ? z : 0);
+    } else {
+      const slice = values.slice(i - WINDOW + 1, i + 1);
+      const mean  = slice.reduce((a,b)=>a+b,0) / WINDOW;
+      const std   = Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0) / WINDOW);
+      const z     = std > 0 ? (values[i] - mean) / std : 0;
+      zs.push(isFinite(z) ? z : 0);
+    }
+  }
+  return zs; // array of z-score values, aligned with series
 }
 
-// ─── GAUGE ───────────────────────────────────────────────
-function drawGauge(zVal){
-  const cv=document.getElementById('gCanvas');
-  const cx=cv.getContext('2d');
-  const W=cv.width,H=cv.height;
-  cx.clearRect(0,0,W,H);
-  const ox=W/2,oy=H*.76,R=W*.38;
-  const sa=Math.PI*1.1,ea=Math.PI*1.9,ta=ea-sa;
+// If API already returns z-score (MVRV), series IS the z-score
+function getZseries(key, rawSeries) {
+  const def = METRIC_DEFS.find(m => m.key === key);
+  if (!def) return [];
+  if (def.isPreZ) return rawSeries.map(s => s.v); // already z
+  return rollingZscore(rawSeries, def.mean, def.std);
+}
 
-  // Background arc segments — blue (cold) to red (hot) like professor's gauge
-  const segs=[
-    {c:'#1d4ed8'},{c:'#3b82f6'},{c:'#60a5fa'},{c:'#93c5fd'},
-    {c:'#fde68a'},{c:'#fbbf24'},{c:'#f97316'},{c:'#ef4444'},{c:'#b91c1c'},{c:'#7f1d1d'}
-  ];
-  const sw=ta/segs.length;
-  segs.forEach((s,i)=>{
-    cx.beginPath();
-    cx.arc(ox,oy,R,sa+i*sw,sa+(i+1)*sw);
-    cx.lineWidth=20; cx.strokeStyle=s.c; cx.globalAlpha=.9; cx.stroke();
-    cx.globalAlpha=1;
-  });
+// RSI (14-period) computed from price series → used for rsi metric
+function computeRSI14(priceSeries) {
+  const prices = priceSeries.map(s => s.v);
+  const rsi = new Array(prices.length).fill(null);
+  if (prices.length < 15) return rsi;
+  let avgGain = 0, avgLoss = 0;
+  for (let i=1; i<=14; i++) {
+    const d = prices[i]-prices[i-1];
+    d>0 ? avgGain+=d : avgLoss+=(-d);
+  }
+  avgGain /= 14; avgLoss /= 14;
+  rsi[14] = avgLoss===0 ? 100 : 100-100/(1+avgGain/avgLoss);
+  for (let i=15; i<prices.length; i++) {
+    const d = prices[i]-prices[i-1];
+    avgGain = (avgGain*13 + Math.max(d,0)) / 14;
+    avgLoss = (avgLoss*13 + Math.max(-d,0)) / 14;
+    rsi[i] = avgLoss===0 ? 100 : 100-100/(1+avgGain/avgLoss);
+  }
+  return rsi;
+}
 
-  // Tick marks
-  for(let i=0;i<=10;i++){
-    const a=sa+(i/10)*ta;
-    const r0=R+12,r1=R+(i%5===0?22:16);
-    cx.beginPath();
-    cx.moveTo(ox+Math.cos(a)*r0,oy+Math.sin(a)*r0);
-    cx.lineTo(ox+Math.cos(a)*r1,oy+Math.sin(a)*r1);
-    cx.lineWidth=i%5===0?2:1;
-    cx.strokeStyle='rgba(255,255,255,.2)';cx.stroke();
+// Build all z-series and composite
+function buildAllZscores(raw) {
+  // --- build series ---
+  const series = {};
+  for (const def of METRIC_DEFS) {
+    if (def.synth) continue;
+    const rawKey = def.key === 'ssr' ? 'puell' : def.key;
+    series[def.key] = raw[rawKey] ? toSeries(raw[rawKey]) : [];
+  }
+  // RSI from price
+  const priceSeries = raw.price ? toSeries(raw.price) : [];
+  if (priceSeries.length >= 15) {
+    const rsiVals = computeRSI14(priceSeries);
+    series['rsi'] = priceSeries.map((p,i) => ({t:p.t, v:rsiVals[i]})).filter(s=>s.v!=null);
+  } else {
+    series['rsi'] = [];
   }
 
-  // Zone labels
-  cx.font='500 10px "IBM Plex Mono"';
-  cx.fillStyle='rgba(255,255,255,.3)';cx.textAlign='center';
-  [[-3,'-3'],[0,'0'],[3,'+3']].forEach(([z,lbl])=>{
-    const p=(z+3)/6,a=sa+p*ta,lr=R+35;
-    cx.fillText(lbl,ox+Math.cos(a)*lr,oy+Math.sin(a)*lr+4);
-  });
+  // --- compute z-series per metric ---
+  const zSeriesMap = {};
+  for (const def of METRIC_DEFS) {
+    const s = series[def.key] || [];
+    zSeriesMap[def.key] = s.length ? getZseries(def.key, s) : [];
+  }
 
-  // Needle — gold like professor's
-  const z=clamp(zVal??0,-3,3);
-  const p=(z+3)/6;
-  const na=sa+p*ta;
-  const nl=R-6;
-  const nx=ox+Math.cos(na)*nl, ny=oy+Math.sin(na)*nl;
+  // --- current z-scores (last value) ---
+  const scores = {};
+  for (const def of METRIC_DEFS) {
+    const zs = zSeriesMap[def.key];
+    scores[def.key] = zs.length ? zs[zs.length-1] : null;
+  }
 
-  // Shadow
-  cx.beginPath();cx.moveTo(ox,oy);cx.lineTo(nx,ny);
-  cx.lineWidth=5;cx.strokeStyle='rgba(0,0,0,.4)';cx.stroke();
+  // --- composite z series (mean across all metrics per day) ---
+  // Align all series to the shortest (approx — use index from end)
+  const minLen = Math.min(...METRIC_DEFS.map(m => zSeriesMap[m.key].length).filter(l=>l>0));
+  const compSeries = [];
+  for (let i=0; i<minLen; i++) {
+    const dayZ = METRIC_DEFS
+      .map(m => { const arr=zSeriesMap[m.key]; return arr.length>=minLen ? arr[arr.length-minLen+i] : null; })
+      .filter(v=>v!=null);
+    compSeries.push(dayZ.length ? dayZ.reduce((a,b)=>a+b,0)/dayZ.length : null);
+  }
 
-  // Needle body
-  cx.beginPath();cx.moveTo(ox,oy);cx.lineTo(nx,ny);
-  cx.lineWidth=2.5;cx.strokeStyle='#f7931a';
-  cx.shadowBlur=10;cx.shadowColor='#f7931a';cx.stroke();cx.shadowBlur=0;
+  // --- composite today ---
+  const validScores = Object.values(scores).filter(v=>v!=null);
+  const composite   = validScores.length ? validScores.reduce((a,b)=>a+b,0)/validScores.length : null;
 
-  // Center pivot
-  cx.beginPath();cx.arc(ox,oy,8,0,Math.PI*2);cx.fillStyle='#f7931a';cx.fill();
-  cx.beginPath();cx.arc(ox,oy,4,0,Math.PI*2);cx.fillStyle='#111820';cx.fill();
-  // Small dot at needle tip
-  cx.beginPath();cx.arc(nx,ny,3,0,Math.PI*2);
-  cx.fillStyle='#f7931a';cx.shadowBlur=8;cx.shadowColor='#f7931a';cx.fill();cx.shadowBlur=0;
+  // --- z Δ week (7 days back in composite series) ---
+  const compLen     = compSeries.filter(v=>v!=null).length;
+  const zWeekBack   = compLen >= 8 ? compSeries[compSeries.length-8] : null;
+  const zDeltaWeek  = (composite!=null && zWeekBack!=null) ? composite - zWeekBack : null;
+
+  return { scores, zSeriesMap, compSeries, composite, zDeltaWeek, priceSeries, series };
 }
 
-// ─── METRICS GRID ────────────────────────────────────────
-function renderMetrics(scores,raw){
-  const grid=document.getElementById('mgrid');
-  grid.innerHTML=MDEF.map(m=>{
-    const z=scores[m.key];
-    const col=zColor(z);
-    const [sig,sc]=zSig(z);
-    const bp=clamp(50+(z??0)/3*50,2,98);
+// ══════════════════════════════════════════════════════════════════
+//  DEMO DATA (fallback if API unavailable)
+// ══════════════════════════════════════════════════════════════════
+function buildDemo() {
+  // Calibrated to professor's dashboard values (22 Mar 2026)
+  const scores = {mvrv:-1.71,nupl:-1.88,sopr:-0.79,mayer:-1.40,ssr:-1.44,rsi:-0.76,profit:-1.46,fg:-1.43};
+  const composite = -1.358;
+  const zDeltaWeek = -0.153;
 
-    // Raw value
-    let rv='—';
-    if(!m.synth){
-      const rk=m.key==='ssr'?'puell':m.key;
-      if(raw[rk]){const v=getLatest(raw[rk]);if(v!=null)rv=f(v,m.key==='profit'?1:m.key==='sopr'?4:2)}
-    }else if(m.key==='rsi'&&z!=null)rv=f(z*15+50,0);
+  // synthetic price series (365 days, roughly $65k–$106k then down to $70k)
+  const priceSeries = [];
+  for (let i=364; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const t = i/364; // 0=today, 1=365d ago
+    const base = 70500;
+    const up = t>0.5 ? (t-0.5)*2*35000 : 0;
+    const noise = (Math.sin(i*0.3)*1200);
+    priceSeries.push({t:d.toISOString().slice(0,10), v: Math.round(base+up+noise)});
+  }
 
-    return`<div class="mc">
-      <div class="mc-bar" style="width:${bp}%;background:${col}"></div>
+  // synthetic composite series (weekly, 52 points)
+  const compSeries = [];
+  for (let i=51; i>=0; i--) {
+    const t = i/51;
+    const noise = (Math.random()-0.5)*0.3;
+    compSeries.push(parseFloat((1.8 + (composite-1.8)*(1-t) + noise).toFixed(3)));
+  }
+
+  // synthetic z-series per metric (52 weekly)
+  const zSeriesMap = {};
+  for (const def of METRIC_DEFS) {
+    const endZ = scores[def.key] ?? 0;
+    zSeriesMap[def.key] = Array.from({length:52},(_,i)=>{
+      const t=i/51, noise=(Math.random()-.5)*.4;
+      return parseFloat((1.5+(endZ-1.5)*t+noise).toFixed(3));
+    });
+    zSeriesMap[def.key][51] = endZ;
+  }
+
+  // Raw series for realised price
+  const rawRealized = [{time:'2026-03-22', value:46200}];
+
+  return {
+    scores, zSeriesMap, compSeries, composite, zDeltaWeek, priceSeries,
+    series: {},
+    raw: { realized: rawRealized, price: priceSeries.map(p=>({time:p.t,value:p.v})) }
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  RENDER UI
+// ══════════════════════════════════════════════════════════════════
+function render(data, raw) {
+  const { scores, zSeriesMap, compSeries, composite, zDeltaWeek, priceSeries } = data;
+  const zCol  = zToColor(composite);
+  const zone  = zToZone(composite);
+
+  // ── Header
+  const now = new Date();
+  document.getElementById('hdrDate').innerHTML = `<b>${now.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'})} ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})} UTC${now.getTimezoneOffset()<=-180?'+':'-'}3</b>`;
+  document.getElementById('hdrLastData').textContent = 'LAST DATA: '+now.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}).toUpperCase();
+  document.getElementById('footDate').textContent = 'OnchainBR · '+now.toLocaleDateString('en-US',{year:'numeric',month:'long'});
+
+  // ── Z-Score card
+  const zsNum = document.getElementById('zsNum');
+  zsNum.textContent = composite!=null ? (composite>=0?'+':'')+fN(composite) : '—';
+  zsNum.style.color = zCol;
+  document.getElementById('zsZone').textContent = zone;
+  document.getElementById('zsZone').style.color = zCol;
+  document.getElementById('zsAccent').style.background = zCol;
+
+  // Weakest metric (highest z-score value)
+  let weakKey=null, weakZ=-Infinity;
+  METRIC_DEFS.forEach(m => { if(scores[m.key]!=null && scores[m.key]>weakZ){weakZ=scores[m.key];weakKey=m.short;} });
+
+  // Price delta week
+  const priceToday  = priceSeries.length ? priceSeries[priceSeries.length-1].v : null;
+  const price7dBack = priceSeries.length >= 8 ? priceSeries[priceSeries.length-8].v : null;
+  const priceDeltaPct = (priceToday&&price7dBack) ? (priceToday-price7dBack)/price7dBack*100 : null;
+
+  document.getElementById('mComp').textContent  = composite!=null ? fN(composite,3) : '—';
+  document.getElementById('mZone').textContent  = zone;
+  document.getElementById('mZone').style.color  = zCol;
+
+  const zwEl = document.getElementById('mZweek');
+  zwEl.textContent  = zDeltaWeek!=null ? (zDeltaWeek>=0?'+':'')+fN(zDeltaWeek,3) : '—';
+  zwEl.className    = 'meta-val '+(zDeltaWeek<0?'g':'r');
+
+  const pwEl = document.getElementById('mPweek');
+  pwEl.textContent  = fPct(priceDeltaPct);
+  pwEl.className    = 'meta-val '+(priceDeltaPct!=null&&priceDeltaPct<0?'r':'g');
+
+  document.getElementById('mWeak').textContent = weakKey || '—';
+
+  // ── Gauge
+  drawGauge(composite);
+  document.getElementById('convPin').style.left = zToPct(composite)+'%';
+
+  // ── Price card
+  document.getElementById('pcPrice').textContent = fUSD(priceToday);
+  document.getElementById('pcDate').textContent  = new Date().toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});
+  const chgEl = document.getElementById('pcChg');
+  chgEl.textContent = fPct(priceDeltaPct)+'  (1w)';
+  chgEl.className   = 'pc-chg '+(priceDeltaPct!=null&&priceDeltaPct<0?'neg':'pos');
+
+  // Signal alignment
+  const accCount = Object.values(scores).filter(z=>z!=null&&z<-1.5).length;
+  const undCount = Object.values(scores).filter(z=>z!=null&&z>=-1.5&&z<-.5).length;
+  const saEl     = document.getElementById('saNum');
+  saEl.textContent = (accCount+undCount)+'↓';
+  saEl.style.color  = zCol;
+  document.getElementById('saDesc').textContent = accCount+' accumulate · '+undCount+' undervalued';
+
+  // ── Info strip
+  document.getElementById('stZ').textContent    = composite!=null ? fN(composite,3) : '—';
+  document.getElementById('stZ').style.color     = zCol;
+  document.getElementById('stZone').textContent  = zone;
+  document.getElementById('stZone').style.color  = zCol;
+  document.getElementById('stThresh').textContent = 'threshold: '+(composite<=-1.5?'< −1.5':composite<=-.5?'−1.5 → −0.5':composite<=.5?'−0.5 → +0.5':composite<=1.5?'+0.5 → +1.5':'> +1.5');
+
+  const szwEl = document.getElementById('stZweek');
+  szwEl.textContent = zDeltaWeek!=null ? (zDeltaWeek>=0?'+':'')+fN(zDeltaWeek,3) : '—';
+  szwEl.style.color = zDeltaWeek!=null&&zDeltaWeek<0 ? 'var(--green)' : 'var(--red)';
+  const prevZ = composite!=null && zDeltaWeek!=null ? composite-zDeltaWeek : null;
+  document.getElementById('stZweekSub').textContent = prevZ!=null ? 'was '+fN(prevZ,3)+' 1w ago' : '—';
+
+  const spwEl = document.getElementById('stPweek');
+  spwEl.textContent = fPct(priceDeltaPct);
+  spwEl.style.color = priceDeltaPct!=null&&priceDeltaPct<0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('stPweekSub').textContent = (price7dBack&&priceToday) ? fUSD(Math.round(price7dBack))+' → '+fUSD(Math.round(priceToday)) : '—';
+
+  document.getElementById('stWeak').textContent = weakKey || '—';
+  document.getElementById('stWeakZ').textContent = weakKey ? 'z = '+fN(weakZ,2) : '—';
+
+  // ── Metrics grid
+  renderMetricsGrid(scores, zSeriesMap, raw);
+
+  // ── Conviction sidebar
+  renderConvictionSidebar(composite, raw);
+
+  // ── Charts
+  renderPriceChart(priceSeries, compSeries);
+  renderOscChart(compSeries);
+  renderOverlayChart(zSeriesMap);
+}
+
+// ── GAUGE ─────────────────────────────────────────────────────────
+function drawGauge(zVal) {
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Center of the arc — lower in canvas so arc has room above
+  const cx = W/2, cy = H * 0.80;
+  const R  = W  * 0.40;
+  const startAngle = Math.PI * 1.08;  // slightly past left horizontal
+  const endAngle   = Math.PI * 1.92;  // slightly before right horizontal
+  const totalAngle = endAngle - startAngle;
+  const arcWidth   = 22;
+
+  // Draw 10 color segments from blue (cold=undervalued) to dark red (hot=overbought)
+  const segColors = [
+    '#1e40af','#2563eb','#3b82f6','#60a5fa','#93c5fd',
+    '#fde68a','#fbbf24','#f97316','#ef4444','#991b1b'
+  ];
+  const segAngle = totalAngle / segColors.length;
+  segColors.forEach((c,i) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, startAngle + i*segAngle, startAngle + (i+1)*segAngle);
+    ctx.lineWidth   = arcWidth;
+    ctx.strokeStyle = c;
+    ctx.globalAlpha = 0.88;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // Thin dark overlay to separate arc from background
+  ctx.beginPath();
+  ctx.arc(cx, cy, R + arcWidth/2 + 1, startAngle, endAngle);
+  ctx.lineWidth   = 1;
+  ctx.strokeStyle = 'rgba(0,0,0,.35)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R - arcWidth/2 - 1, startAngle, endAngle);
+  ctx.lineWidth   = 1;
+  ctx.strokeStyle = 'rgba(0,0,0,.35)';
+  ctx.stroke();
+
+  // Tick marks at every 10th of the arc
+  for (let i=0; i<=10; i++) {
+    const a   = startAngle + (i/10)*totalAngle;
+    const r0  = R + arcWidth/2 + 3;
+    const r1  = R + arcWidth/2 + (i%5===0 ? 13 : 8);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a)*r0, cy + Math.sin(a)*r0);
+    ctx.lineTo(cx + Math.cos(a)*r1, cy + Math.sin(a)*r1);
+    ctx.lineWidth   = i%5===0 ? 1.5 : 1;
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.stroke();
+  }
+
+  // Zone labels: -3, -1.5, 0, +1.5, +3
+  ctx.font         = '500 10px "IBM Plex Mono"';
+  ctx.fillStyle    = 'rgba(255,255,255,.35)';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  [[-3,'-3'], [-1.5,'-1.5'], [0,'0'], [1.5,'+1.5'], [3,'+3']].forEach(([z,lbl]) => {
+    const pct = (z+3)/6;
+    const a   = startAngle + pct*totalAngle;
+    const lr  = R + arcWidth/2 + 26;
+    ctx.fillText(lbl, cx + Math.cos(a)*lr, cy + Math.sin(a)*lr);
+  });
+
+  // ── Needle
+  const z = clamp(zVal ?? 0, -3, 3);
+  const pct = (z+3)/6;
+  const needleAngle = startAngle + pct*totalAngle;
+  const needleLen   = R - arcWidth/2 - 4;
+  const nx = cx + Math.cos(needleAngle)*needleLen;
+  const ny = cy + Math.sin(needleAngle)*needleLen;
+
+  // Needle shadow
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.lineWidth   = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,.5)';
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+
+  // Needle body — gold like professor's
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.lineWidth   = 2.5;
+  ctx.strokeStyle = '#f7931a';
+  ctx.shadowBlur  = 10;
+  ctx.shadowColor = 'rgba(247,147,26,.6)';
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
+
+  // Tip dot
+  ctx.beginPath();
+  ctx.arc(nx, ny, 3, 0, Math.PI*2);
+  ctx.fillStyle  = '#f7931a';
+  ctx.shadowBlur = 8;
+  ctx.shadowColor= 'rgba(247,147,26,.7)';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Pivot circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, 9, 0, Math.PI*2);
+  ctx.fillStyle = '#f7931a';
+  ctx.shadowBlur = 12;
+  ctx.shadowColor= 'rgba(247,147,26,.5)';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI*2);
+  ctx.fillStyle = '#111920';
+  ctx.fill();
+}
+
+// ── METRICS GRID ──────────────────────────────────────────────────
+function renderMetricsGrid(scores, zSeriesMap, raw) {
+  const grid = document.getElementById('metricsGrid');
+  grid.innerHTML = METRIC_DEFS.map(m => {
+    const z       = scores[m.key];
+    const col     = zToColor(z);
+    const [sig, sc] = zToSig(z);
+    const barPct  = clamp(50+(z??0)/3*50, 2, 98);
+
+    // Raw value display
+    let rawVal = '—';
+    if (!m.synth) {
+      const rk = m.key==='ssr' ? 'puell' : m.key;
+      if (raw&&raw[rk]) {
+        const s = toSeries(raw[rk]);
+        const v = s.length ? s[s.length-1].v : null;
+        if (v!=null) rawVal = fN(v, m.key==='profit'?1 : m.key==='sopr'?4 : 2);
+      }
+    } else if (m.key==='rsi' && z!=null) {
+      rawVal = fN(z*15+50, 0);
+    }
+
+    return `<div class="mc">
+      <div class="mc-bottom-bar" id="mcbar-${m.key}" style="width:${barPct}%;background:${col}"></div>
       <div class="mc-name">${m.name}</div>
-      <div class="mc-z" style="color:${col}">${z!=null?(z>=0?'+':'')+f(z):'—'}</div>
+      <div class="mc-z" style="color:${col}" id="mcz-${m.key}">${z!=null?(z>=0?'+':'')+fN(z):'—'}</div>
       <div class="mc-sig" style="color:${sc}">${sig}</div>
-      <div class="mc-raw">val: ${rv}</div>
+      <div class="mc-raw">val: ${rawVal}</div>
       <div class="mc-spark"><canvas id="spark-${m.key}"></canvas></div>
     </div>`;
   }).join('');
 
   // Draw sparklines after DOM update
-  setTimeout(()=>MDEF.forEach(m=>{
-    const c=document.getElementById('spark-'+m.key);
-    if(!c)return;
-    const z=scores[m.key];
-    drawSparkline(c,z,zColor(z));
-  }),0);
+  requestAnimationFrame(() => {
+    METRIC_DEFS.forEach(m => {
+      const c = document.getElementById('spark-'+m.key);
+      if (!c) return;
+      const zs = zSeriesMap[m.key] || [];
+      const color = zToColor(scores[m.key]);
+      drawSparkline(c, zs, color);
+    });
+  });
 }
 
-function drawSparkline(canvas,currentZ,color){
-  const n=20;
-  const data=[];
-  for(let i=0;i<n;i++){
-    const t=i/(n-1);
-    const noise=(Math.random()-.5)*.4;
-    const end=currentZ??0;
-    data.push(end+(1-t)*(end>0?1.2:-0.8)+noise);
-  }
-  data[n-1]=currentZ??0;
-
-  const ctx=canvas.getContext('2d');
-  const W=canvas.offsetWidth||80,H=canvas.offsetHeight||28;
-  canvas.width=W;canvas.height=H;
-  const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
-  const pts=data.map((v,i)=>({x:(i/(n-1))*W,y:H-((v-mn)/rng)*(H-4)-2}));
-
+// Tiny sparkline canvas for each metric
+function drawSparkline(canvas, zseries, color) {
+  const ctx = canvas.getContext('2d');
+  // Take last 30 values
+  const data = zseries.slice(-30);
+  if (!data.length) return;
+  const W = canvas.offsetWidth || 80, H = 30;
+  canvas.width = W; canvas.height = H;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const rng = mx - mn || 1;
+  const pts = data.map((v,i) => ({
+    x: (i/(data.length-1)) * W,
+    y: H - ((v-mn)/rng)*(H-4) - 2
+  }));
   ctx.clearRect(0,0,W,H);
 
-  // Fill
-  const grad=ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,color+'33');grad.addColorStop(1,color+'00');
+  // Fill gradient
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, color+'44');
+  grad.addColorStop(1, color+'08');
   ctx.beginPath();
-  ctx.moveTo(pts[0].x,H);pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.lineTo(pts[n-1].x,H);ctx.closePath();
-  ctx.fillStyle=grad;ctx.fill();
+  ctx.moveTo(pts[0].x, H);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
 
   // Line
-  ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();
+  pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
 }
 
-// ─── CONVICTION SIDEBAR ──────────────────────────────────
-function renderSidebar(zc){
-  document.getElementById('czRows').innerHTML=ZONES.map(zone=>{
-    const active=zc!=null&&zc>=zone.min&&zc<zone.max;
-    return`<div class="cz ${active?'active':''}" style="color:${zone.color};${active?'border-color:'+zone.color+'44':''}">
-      <div class="cz-l">
+// ── CONVICTION SIDEBAR ────────────────────────────────────────────
+function renderConvictionSidebar(composite, raw) {
+  // Zones
+  document.getElementById('czList').innerHTML = ZONES.map(zone => {
+    const active = composite!=null && composite>=zone.min && composite<zone.max;
+    return `<div class="cz-row ${active?'active':''}" style="color:${zone.color};${active?'border-color:'+zone.color+'44':''}">
+      <div class="cz-left">
         <div class="cz-dot" style="background:${active?zone.color:zone.color+'55'}"></div>
         <span class="cz-name" style="color:${active?zone.color:'var(--t2)'}">${zone.name}</span>
       </div>
       <span class="cz-range">${zone.range}</span>
     </div>`;
   }).join('');
-}
 
-function renderEP(raw){
-  const checks=[['price','Price'],['mvrv','MVRV Z-Score'],['nupl','NUPL'],['sopr','SOPR'],['mayer','Mayer'],['puell','Puell/SSR'],['profit','Supply Profit'],['fg','Fear & Greed']];
-  document.getElementById('epList').innerHTML=checks.map(([k,lbl])=>{
-    const ok=raw[k]!=null;
-    return`<div class="ep" style="color:${ok?'var(--green)':'var(--t3)'}">
-      <div style="width:5px;height:5px;border-radius:50%;background:${ok?'var(--green)':'var(--t3)'}"></div>
-      ${lbl}
+  // API endpoints
+  const checks = [
+    ['price','Price'],['mvrv','MVRV Z-Score'],['nupl','NUPL'],
+    ['sopr','SOPR'],['mayer','Mayer Multiple'],['puell','Puell/SSR'],
+    ['profit','Supply Profit %'],['fg','Fear & Greed']
+  ];
+  document.getElementById('epList').innerHTML = checks.map(([k,lbl]) => {
+    const ok = raw && raw[k] != null;
+    return `<div class="ep-row" style="color:${ok?'var(--green)':'var(--t3)'}">
+      <div class="ep-dot" style="background:${ok?'var(--green)':'var(--t3)'}"></div>${lbl}
     </div>`;
   }).join('');
 }
 
-// ─── CHARTS ──────────────────────────────────────────────
-function weekLabels(n){
-  const out=[];
-  for(let i=n-1;i>=0;i--){
-    const d=new Date();d.setDate(d.getDate()-i*7);
-    out.push(d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}));
-  }
-  return out;
-}
-
-const chartDefaults={
-  responsive:true,
-  maintainAspectRatio:false,
-  animation:{duration:700},
-  plugins:{legend:{display:false},tooltip:{
-    backgroundColor:'rgba(13,17,23,.96)',borderColor:'rgba(255,255,255,.08)',borderWidth:1,
-    titleColor:'#8fa8bf',bodyColor:'#eef2f6',
-    titleFont:{family:'IBM Plex Mono',size:8},bodyFont:{family:'IBM Plex Mono',size:10}
-  }},
-  scales:{
-    x:{ticks:{color:'#2d4558',font:{family:'IBM Plex Mono',size:8},maxTicksLimit:8},
-       grid:{color:'rgba(255,255,255,.03)'},border:{color:'transparent'}},
-    y:{ticks:{color:'#2d4558',font:{family:'IBM Plex Mono',size:9}},
-       grid:{color:'rgba(255,255,255,.03)'},border:{color:'transparent'}}
+// ══════════════════════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════════════════════
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 700 },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(11,17,23,.96)',
+      borderColor:     'rgba(255,255,255,.08)',
+      borderWidth: 1,
+      titleColor:  '#8fa8c0',
+      bodyColor:   '#edf2f7',
+      titleFont: { family:'IBM Plex Mono', size:8 },
+      bodyFont:  { family:'IBM Plex Mono', size:10 },
+    }
+  },
+  scales: {
+    x: {
+      ticks:  { color:'#2d4558', font:{ family:'IBM Plex Mono', size:8 }, maxTicksLimit:8 },
+      grid:   { color:'rgba(255,255,255,.03)' },
+      border: { color:'transparent' }
+    },
+    y: {
+      ticks:  { color:'#2d4558', font:{ family:'IBM Plex Mono', size:9 } },
+      grid:   { color:'rgba(255,255,255,.03)' },
+      border: { color:'transparent' }
+    }
   }
 };
 
-function renderOsc(scores,zc){
-  const ctx=document.getElementById('oscChart').getContext('2d');
-  if(oscC)oscC.destroy();
-  const n=52;
-  const lbs=weekLabels(n);
+// BTC/USD price chart — each day segment colored by z-composite zone
+function renderPriceChart(priceSeries, compSeries) {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if (chartPrice) chartPrice.destroy();
 
-  // Build plausible history ending at current zc
-  const data=[];
-  for(let i=0;i<n;i++){
-    const t=i/(n-1);
-    const noise=(Math.random()-.5)*.25;
-    const start=1.8, end=zc??-1.36;
-    data.push(parseFloat((start+(end-start)*t+noise).toFixed(3)));
-  }
-  data[n-1]=zc??-1.36;
+  // Take last 365 price points and last 365 comp z values
+  const days = priceSeries.slice(-365);
+  const zDays = compSeries.slice(-365);
 
-  // Reference lines
-  const refLines=[-1.5,-.5,.5,1.5].map(v=>({
-    type:'line',yMin:v,yMax:v,borderColor:'rgba(255,255,255,.08)',borderWidth:1,borderDash:[4,4]
-  }));
-
-  oscC=new Chart(ctx,{
-    type:'line',
-    data:{labels:lbs,datasets:[{
-      data,
-      borderWidth:2,fill:false,tension:.4,
-      pointRadius:data.map((_,i)=>i===n-1?5:2),
-      pointBackgroundColor:data.map(z=>zColor(z)),
-      pointBorderColor:'transparent',
-      segment:{borderColor:ctx2=>zColor(data[ctx2.p0DataIndex])}
-    }]},
-    options:{...chartDefaults,plugins:{...chartDefaults.plugins,annotation:{annotations:refLines}},
-      scales:{...chartDefaults.scales,y:{...chartDefaults.scales.y,
-        ticks:{...chartDefaults.scales.y.ticks,
-          callback:v=>(v>=0?'+':'')+v.toFixed(1)+' σ'}}}}
+  const labels = days.map((p,i) => {
+    const d = new Date(p.t || (new Date().setDate(new Date().getDate()-(days.length-1-i))));
+    return typeof d.toLocaleDateString==='function' ? d.toLocaleDateString('en-US',{month:'short',day:'2-digit'}) : p.t;
   });
-}
+  const prices = days.map(p => p.v);
 
-function renderOverlay(scores){
-  const ctx=document.getElementById('ovlChart').getContext('2d');
-  if(ovlC)ovlC.destroy();
-  const n=24;
-  const lbs=weekLabels(n).filter((_,i)=>i%3===0);
-
-  const datasets=MDEF.map(m=>{
-    const z=scores[m.key];
-    const data=[];
-    for(let i=0;i<n;i++){
-      const t=i/(n-1),noise=(Math.random()-.5)*.35;
-      const end=z??0,start=end>0?end+1.5:end-.5;
-      data.push(parseFloat((start+(end-start)*t+noise).toFixed(3)));
+  if (chartPrice) chartPrice.destroy();
+  chartPrice = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data:   prices,
+        borderWidth: 1.5,
+        fill:   false,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        // Color each segment by the composite z-score zone of that day
+        segment: {
+          borderColor: ctx2 => {
+            const z = zDays[ctx2.p0DataIndex] ?? 0;
+            return zToColor(z);
+          }
+        },
+        borderColor: '#f7931a',
+        backgroundColor: 'transparent',
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: {
+          ...CHART_DEFAULTS.scales.y,
+          type: 'logarithmic',
+          ticks: {
+            ...CHART_DEFAULTS.scales.y.ticks,
+            callback: v => fUSD(v)
+          }
+        }
+      },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            label: ctx2 => {
+              const z = zDays[ctx2.dataIndex];
+              return ` ${fUSD(ctx2.raw)}  z: ${z!=null?fZ(z):'—'}`;
+            }
+          }
+        }
+      }
     }
-    data[n-1]=z??0;
-    return{label:m.short,data,borderColor:m.color,borderWidth:1.5,pointRadius:0,fill:false,tension:.4};
-  });
-
-  ovlC=new Chart(ctx,{
-    type:'line',
-    data:{labels:lbs,datasets},
-    options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{
-      display:true,position:'top',
-      labels:{color:'#4d6b85',font:{family:'IBM Plex Mono',size:8},boxWidth:10,padding:6}
-    }}}
   });
 }
 
-// ═══════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════
-async function init(){
-  const btn=document.getElementById('btnRef');
-  btn.classList.add('spin');btn.disabled=true;
-  setStatus('load','Buscando dados...');
+// Z-Composite Oscillator — weekly, zone-colored line
+function renderOscChart(compSeries) {
+  const ctx = document.getElementById('oscChart').getContext('2d');
+  if (chartOsc) chartOsc.destroy();
+
+  // Downsample to weekly (every 7th point) of last 52 weeks
+  const weekly = [];
+  for (let i=compSeries.length-1; i>=0 && weekly.length<52; i-=7) {
+    weekly.unshift(compSeries[i]);
+  }
+
+  const labels = weekly.map((_,i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (weekly.length-1-i)*7);
+    return d.toLocaleDateString('en-US',{month:'short',day:'2-digit'});
+  });
+
+  chartOsc = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data:   weekly,
+        borderWidth: 2,
+        fill:   false,
+        tension: 0.4,
+        pointRadius:          weekly.map((_,i)=>i===weekly.length-1?5:2),
+        pointBackgroundColor: weekly.map(z=>zToColor(z)),
+        pointBorderColor:     'transparent',
+        segment: {
+          borderColor: ctx2 => zToColor(weekly[ctx2.p0DataIndex])
+        }
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: {
+          ...CHART_DEFAULTS.scales.y,
+          ticks: {
+            ...CHART_DEFAULTS.scales.y.ticks,
+            callback: v => (v>=0?'+':'')+v.toFixed(1)+' σ'
+          }
+        }
+      },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: { label: ctx2 => ` z = ${fZ(ctx2.raw)}` }
+        }
+      }
+    }
+  });
+}
+
+// Individual Z-Scores Overlay
+function renderOverlayChart(zSeriesMap) {
+  const ctx = document.getElementById('overlayChart').getContext('2d');
+  if (chartOverlay) chartOverlay.destroy();
+
+  // Last 24 weekly points per metric
+  const N = 24;
+  const labels = Array.from({length:N}, (_,i) => {
+    const d = new Date();
+    d.setDate(d.getDate()-(N-1-i)*7);
+    return d.toLocaleDateString('en-US',{month:'short',day:'2-digit'});
+  });
+
+  const datasets = METRIC_DEFS.map(m => {
+    const zs = zSeriesMap[m.key] || [];
+    // Sample N weekly points from end
+    const data = [];
+    for (let i=0; i<N; i++) {
+      const idx = zs.length - N + i;
+      data.push(idx>=0 ? parseFloat(fN(zs[idx],3)) : null);
+    }
+    return {
+      label:           m.short,
+      data,
+      borderColor:     m.color,
+      borderWidth:     1.5,
+      pointRadius:     0,
+      fill:            false,
+      tension:         0.4,
+      spanGaps:        true,
+    };
+  });
+
+  chartOverlay = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color:    '#4d6a85',
+            font:     { family:'IBM Plex Mono', size:8 },
+            boxWidth: 10,
+            padding:  8,
+          }
+        }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ══════════════════════════════════════════════════════════════════
+async function bootstrap() {
+  const btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  setStatus('load', 'Loading...');
   hideAlert();
 
-  let raw,scores,zc;
-  try{
-    raw=await fetchAll();
-    scores=computeScores(raw);
-    zc=composite(scores);
-    const src=BASE===BASE_PROXY?'Via proxy CORS · Dados reais':'Dados ao vivo · API direta';
-    setStatus('live',src);
-  }catch(e){
-    raw=demoRaw();scores=demoScores();zc=-1.358;
-    setStatus('err','Demo · API indisponível');
-    showAlert('API indisponível neste ambiente (CORS). Valores demonstrativos calibrados ao dashboard do professor — 22 Mar 2026.');
+  let raw, data;
+  try {
+    raw  = await fetchAllRaw();
+    data = buildAllZscores(raw);
+    const src = API_KEY ? 'Live · BGeometrics API' : 'Live · Free API';
+    setStatus('live', src);
+  } catch(err) {
+    console.warn('API error:', err.message);
+    data = buildDemo();
+    raw  = data.raw || {};
+    setStatus('err', 'Demo mode · API unavailable');
+    showAlert(
+      API_KEY
+        ? 'API error (check your key or network). Showing calibrated demo data.'
+        : 'API unavailable (CORS on this host). Add your API key or use Live Server. Showing calibrated demo values.'
+    );
   }
 
-  render(raw,scores,zc);
-  btn.classList.remove('spin');btn.disabled=false;
+  render(data, raw);
+  btn.disabled = false;
+  btn.classList.remove('loading');
 }
 
-setInterval(init,5*60*1000);
-init();
+// Auto-refresh every 5 minutes
+setInterval(bootstrap, 5 * 60 * 1000);
+
+// Start
+bootstrap();
 </script>
 </body>
 </html>
